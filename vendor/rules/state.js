@@ -1,4 +1,5 @@
 import { CATEGORY_SLOT, SLOT_LABEL } from "./clothing.js";
+import { BODIES } from "./looks.js";
 import { createBoard, finale, random, swap } from "./match3.js";
 import { createWorkshop, moveOrMerge, putMaterial } from "./workshop.js";
 const JOURNAL_LIMIT = 500;
@@ -46,8 +47,8 @@ export const FIRST_ROOM = "bedroom";
 const HOME_SPOTS = { atone: { room: FIRST_ROOM, x: 6, y: 2 }, tsunu: { room: FIRST_ROOM, x: 2, y: 6 } };
 export const STARTER_INVENTORY = { sofa: 1, table: 1, bed: 1, bookshelf: 1, plant: 2, lamp: 1, rug: 1, dogbed: 2 };
 export const STARTER_WARDROBE = { tee_gray: 1, jeans_shorts: 1, shirt_gray: 1, pants_gray: 1, shoes_gray: 1 };
-export const STARTER_WORN = { atone: { top: "tee_gray", bottom: "jeans_shorts", shoes: "shoes_gray" }, tsunu: { top: "shirt_gray", bottom: "pants_gray", shoes: "shoes_gray" } }; // 鞋子在家不穿、在店裡穿
-export const STARTER_CLOTHES_COLORS = { tee_gray: "#f4b3c2", shirt_gray: "#a9c8ee", pants_gray: "#cfbda2" }; // 阿童一開始穿粉紅 T 恤；阿宇藍襯衫配卡其褲
+export const STARTER_WORN = { atone: { ...BODIES.f.starter }, tsunu: { ...BODIES.m.starter } }; // 兩版共用的起始穿著（鞋子在家不穿、在店裡穿）
+export const STARTER_CLOTHES_COLORS = { ...BODIES.f.starterColors, ...BODIES.m.starterColors };
 export function createInitialState() {
     return {
         version: 1, revision: 0, money: 0,

@@ -2,6 +2,7 @@
 // 遊戲存檔（錢、材料、家具、咖啡廳）交給 game.js，娃娃存檔交給 dolls.js，兩份都在這台瀏覽器。
 
 import { loadSkeleton, samplePose } from "../vendor/player/player.js";
+import { BODIES, CLOTHES_COLORS, headParts, randomLooks } from "../vendor/rules/looks.js";
 import { CafeView } from "../vendor/web/cafe-view.js";
 import { CATEGORY_SLOT, SLOT_LABEL, dressUp } from "../vendor/web/dress.js";
 import { IconSheet } from "../vendor/web/icons.js";
@@ -9,10 +10,9 @@ import { PuzzleView } from "../vendor/web/puzzle-view.js";
 import { WorkshopView } from "../vendor/web/workshop-view.js";
 import { startCafeClock } from "./cafe-clock.js";
 import { setupCreator } from "./creator.js";
-import { addDoll, headParts, loadDolls, randomShopkeeper, removeDoll, saveDolls, updateDoll } from "./dolls.js";
+import { addDoll, loadDolls, randomShopkeeper, removeDoll, saveDolls, updateDoll } from "./dolls.js";
 import { createGame, loadContent } from "./game.js";
 import { House } from "./house.js";
-import { BODIES, CLOTHES_COLORS } from "./looks.js";
 import { downloadSave, uploadSave } from "./drive-save.js";
 import { checkSave, exportSave, readSave, saveData } from "./save-file.js";
 
@@ -66,7 +66,8 @@ const house = new House({
 const icons = new IconSheet(content.recipes, () => renderAll());
 const puzzle = new PuzzleView($("board"), $("puzzleInfo"), $("puzzleStart"), icons, apply, content.settings.stamina);
 const workshop = new WorkshopView({ materials: $("materials"), grid: $("grid"), products: $("products") }, content.recipes, icons, apply);
-const cafe = new CafeView($("cafeCanvas"), { skeleton: skeletons.front, guestSkeletons: Object.values(BODIES).map((body) => skeletons[body.views.front]), animations, samplePose }, icons, apply);
+const guests = Object.entries(BODIES).map(([body, spec]) => ({ body, views: { front: skeletons[spec.views.front], front34: skeletons[spec.views.front34], back34: skeletons[spec.views.back34] } }));
+const cafe = new CafeView($("cafeCanvas"), { skeleton: skeletons.front, guests, looks: { headParts, randomLooks }, animations, samplePose }, icons, apply);
 $("cafeToggle").onclick = () => apply({ kind: "shop_open", open: !game.state.shops.cafe.open });
 startCafeClock(game, apply);
 

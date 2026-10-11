@@ -5,13 +5,9 @@ const W = 900, H = 360, FLOOR_Y = 320, COUNTER = { x: 110, w: 170, h: 90 }, DOOR
 const QUEUE_X = [330, 420, 505];   // 排隊位置在櫃台與桌組之間
 const WALK_SPEED = 220;   // 畫布像素／秒
 const GUEST_FACING = { front34: 1, back34: -1 };   // 斜前面向左邊的櫃台、斜後面向右邊的門
-const CUSTOMER_SKINS = ["#ffe8d1", "#f2d2b8", "#e2b894", "#c9976e", "#ffe1c8", "#d9ad88"];
 const CUSTOMER_TOPS = ["#9fd8c9", "#f2dc8c", "#c9b6e4", "#f4b3c2", "#a9c8ee", "#d9c3a5"];   // 上衣模板染的顏色
-const CUSTOMER_HAIR_COLORS = ["#3b2a22", "#6b4a32", "#a8743f", "#e2c07a", "#c75c4a", "#e98fb0", "#6c8fd6"];   // 染灰稿頭髮（kid_*）
 const CUSTOMER_PANTS = ["#cfbda2", "#3d4a66", "#4a4a4f", "#a89a86", "#6b5442", "#5a6f95"];   // 染客人的長褲、短褲模板（卡其、深藍、炭灰、灰褐、咖啡、牛仔藍）
 const CUSTOMER_SHOES = ["#5a4636", "#2f3440", "#8a6a4a", "#e9e4da", "#7a3b3b", "#3f5a4a"];   // 染灰稿便鞋
-const CUSTOMER_IRIS_COLORS = ["#5b3a24", "#8a5a2b", "#3f6fa8", "#4f8a5b", "#7a5aa6", "#c0843a"];
-const CUSTOMER_LIP_COLORS = ["#e8a48c", "#de9a96", "#d65a6e", "#c86478", "#b4505a", "#e2a0a0"];   // 染灰稿唇色（kid_*_lips）
 const PATIENCE_MS = 150_000;
 // 店面圖（小葵畫的正側面剖面）：wall 滿版、counter 與 table（只有咖啡廳有桌組）疊在前面；圖沒到就畫色塊
 const ART = {   // 相對頁面的網址：小屋與兒童版都從自己的根目錄找
@@ -23,9 +19,9 @@ const TABLE = { x: 560, w: 185, h: 152 };   // 桌組畫在門左邊
 const BRUSH_R = 11;   // 裝飾點右上角小刷子的半徑
 
 export class CafeView {
-  /** guestSkeletons：客人可以用的素體（女生、男生）。每個可以是三個視角一組 { front, front34, back34 }（進門斜前、離開斜後），
-   *  或只給正面骨架（客人一律正面、靠左右翻轉表示方向）；沒給就只用 skeleton。 */
-  constructor(canvas, { skeleton, guestSkeletons = [skeleton], animations, samplePose }, icons, act) {
+  /** guests：客人可以用的素體 [{ body: "f"|"m", views }]，views 是三個視角一組 { front, front34, back34 }（進門斜前、離開斜後），
+   *  或只有 { front }（客人一律正面、靠左右翻轉表示方向）。looks：兩版共用的捏角模組（規則層的 looks.js），客人的長相照它抽。 */
+  constructor(canvas, { skeleton, guests, looks, animations, samplePose }, icons, act) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.skeleton = skeleton;
@@ -34,7 +30,8 @@ export class CafeView {
     this.icons = icons;
     this.act = act;
     this.owner = { skin: "#ffe8d1", outfits: ["atone_face", "atone_mouth", "atone_hair", "atone_glasses"], bodyTint: null };   // app.js 依存檔穿著更新
-    this.wardrobes = guestSkeletons.map(guestWardrobe);
+    this.looks = looks;
+    this.wardrobes = guests.map(({ body, views }) => guestWardrobe(body, views));
     this.customers = new Map();   // id → { data, x, target, leaving, look }
     this.state = null;
     this.ratio = 1;
@@ -172,7 +169,8 @@ export class CafeView {
     }
   }
 
-  /** 用外觀種子挑素體、上衣顏色、髮型與髮色、眼睛與瞳孔色、嘴巴與唇色、膚色；同一顆種子永遠是同一個樣子。 */
+  /** 用外觀種子挑素體、上衣顏色、長相（共用捏角模組的隨機長相：髮型、髮色、眼睛、瞳色、嘴巴、唇色、膚色）、鞋子與褲子顏色；
+   *  同一顆種子永遠是同一個樣子。 */
   dressGuest(seed) {
     const pick = seededPicker(seed);
     const wardrobe = pick(this.wardrobes);
@@ -180,19 +178,12 @@ export class CafeView {
     const top = wardrobe.top ? [wardrobe.top.dye ? { name: wardrobe.top.name, tint: topColor, tuck: !!wardrobe.top.tucked } : wardrobe.top.name] : [];
     const bottom = (wardrobe.top?.with ?? []).map((entry) => (typeof entry === "string" ? entry : { ...entry }));
     const outfits = wardrobe.top?.tucked ? [...top, ...bottom] : [...bottom, ...top];   // 下身先畫，上衣下擺蓋在褲頭上；紮進去的反過來
-    const face = wardrobe.faces.length ? pick(wardrobe.faces) : null;
-    // 嘴巴另外抽：只在有獨立嘴巴層的款式之間混搭（guest_* 的嘴巴畫在五官圖裡，換不掉）
-    const mouth = face?.mouth ? pick(wardrobe.faces.filter((option) => option.mouth)) : face;
-    if (face?.iris) outfits.push({ name: face.iris, tint: pick(CUSTOMER_IRIS_COLORS) });   // 瞳孔、唇色墊在五官底下
-    if (mouth?.lips) outfits.push({ name: mouth.lips, tint: pick(CUSTOMER_LIP_COLORS) });
-    if (face) outfits.push(face.face, ...(mouth?.mouth ? [mouth.mouth] : []));
-    const hair = wardrobe.hairs.length ? pick(wardrobe.hairs) : null;
-    if (hair) outfits.push(hair.dye ? { name: hair.name, tint: pick(CUSTOMER_HAIR_COLORS) } : hair.name);
-    const skin = pick(CUSTOMER_SKINS);
-    if (wardrobe.shoes) outfits.unshift({ name: "shoes", tint: pick(CUSTOMER_SHOES) });   // 最後才抽（不打亂舊客人的長相）；排在最前面先畫，褲管蓋在鞋口上
-    for (const entry of bottom) if (entry.dye) entry.tint = pick(CUSTOMER_PANTS);   // 長褲顏色比鞋子更晚加進來，排在最後抽
+    const looks = this.looks.randomLooks(pick, wardrobe.body, wardrobe.outfits);
+    outfits.push(...this.looks.headParts(looks));
+    if (wardrobe.shoes) outfits.unshift({ name: "shoes", tint: pick(CUSTOMER_SHOES) });   // 排在最前面先畫，褲管蓋在鞋口上
+    for (const entry of bottom) if (entry.dye) entry.tint = pick(CUSTOMER_PANTS);
     for (const skeleton of Object.values(wardrobe.views)) skeleton.preloadOutfits(outfits);   // 進門斜前、離開斜後：每個視角的衣服先載好，轉身不閃素體
-    return { views: wardrobe.views, skin, outfits };
+    return { views: wardrobe.views, skin: looks.skin, outfits };
   }
 
   /** 客人朝哪個視角：進門、排隊面向櫃台是斜前，買完走向門口是斜後；素體沒有那個視角就用正面、靠左右翻轉。 */
@@ -272,25 +263,18 @@ function guestTop(views) {
   return null;
 }
 
-/**
- * 一個素體能配給客人的衣著：鞋子、上衣、髮型、五官。
- * guest_* 是彩色原稿；kid_* 是灰稿，頭髮要染色，五官另有瞳孔層（_iris）、唇色層（_lips）與嘴巴層（_mouth）。
- */
-function guestWardrobe(skeletons) {
-  const views = skeletons.data ? { front: skeletons } : skeletons;   // 只給正面骨架＝不轉身
-  const outfits = views.front.data.outfits ?? {};
-  const names = Object.keys(outfits);
-  const has = (name) => (outfits[name] ? name : null);
-  const inView = (view) => (name) => !views[view] || !!views[view].data.outfits?.[name];   // 會轉身就只挑那個視角也有的零件：臉要有斜前，頭髮要有斜後
+/** 一個素體能配給客人的衣著：鞋子、上衣，以及長相可以挑的套名（轉身不會缺零件）：
+ *  頭髮每個視角都要有；五官只要斜後以外的視角有（斜後看不到臉）。 */
+function guestWardrobe(body, views) {
+  const inViews = (skeletons) => (name) => skeletons.every((skeleton) => skeleton.data.outfits?.[name]);
+  const everyView = inViews(Object.values(views));
+  const faceViews = inViews(Object.entries(views).filter(([view]) => view !== "back34").map(([, skeleton]) => skeleton));
   return {
+    body,
     views,
-    shoes: Object.values(views).every((skeleton) => skeleton.data.outfits?.shoes),   // 灰稿便鞋（scripts/make_shoes.py），每個視角都有才穿
+    shoes: everyView("shoes"),   // 灰稿便鞋（scripts/make_shoes.py），每個視角都有才穿
     top: guestTop(views),
-    hairs: names.filter((name) => /^(guest|kid)_.*_hair$/.test(name)).filter(inView("front34")).filter(inView("back34")).map((name) => ({ name, dye: name.startsWith("kid_") })),
-    faces: names.filter((name) => /^(guest|kid)_.*_face$/.test(name)).filter(inView("front34")).map((face) => {
-      const base = face.replace(/_face$/, "");
-      return { face, iris: has(`${base}_iris`), lips: has(`${base}_lips`), mouth: has(`${base}_mouth`) };
-    }),
+    outfits: Object.fromEntries(Object.keys(views.front.data.outfits ?? {}).filter((name) => (name.endsWith("_hair") ? everyView(name) : faceViews(name))).map((name) => [name, true])),
   };
 }
 

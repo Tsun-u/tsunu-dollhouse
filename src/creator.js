@@ -1,8 +1,8 @@
 // 捏娃娃畫面：左邊預覽（可轉三個角度），右邊一組一組的選項；按「好了」交給 onSave。
 // 衣服不在這裡選：新娃娃穿基本款，之後在衣櫃換。
 
-import { createDoll, headParts } from "./dolls.js";
-import { BODIES, FACES, GLASSES, HAIRS, MOUTHS, HAIR_COLORS, IRIS_COLORS, LIP_COLORS, SKIN_TONES, available } from "./looks.js";
+import { BODIES, FACES, GLASSES, HAIRS, MOUTHS, HAIR_COLORS, IRIS_COLORS, LIP_COLORS, SKIN_TONES, available, headParts } from "../vendor/rules/looks.js";
+import { createDoll } from "./dolls.js";
 
 const VIEW_LABELS = { front: "正面", front34: "斜前", back34: "斜後" };
 const $ = (id) => document.getElementById(id);

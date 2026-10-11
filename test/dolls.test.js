@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { DOLLS_KEY, MAX_DOLLS, addDoll, createDoll, headParts, loadDolls, randomShopkeeper, removeDoll, saveDolls, updateDoll } from "../src/dolls.js";
-import { LIP_COLORS } from "../src/looks.js";
+import { DOLLS_KEY, MAX_DOLLS, addDoll, createDoll, loadDolls, randomShopkeeper, removeDoll, saveDolls, updateDoll } from "../src/dolls.js";
 
 const doll = (overrides = {}) => createDoll({ name: "小花", body: "f", ...overrides }, () => `id-${Math.random()}`);
 
@@ -57,31 +56,6 @@ test("顧店的娃娃隨機抽", () => {
   assert.equal(randomShopkeeper(dolls, () => 0.99).name, "三");
 });
 
-test("頭部零件順序：瞳孔、唇色在最底下，眼鏡在最上面；頭髮帶髮色、眉毛比髮色暗一階、唇色帶口紅色、眼鏡染鏡框色", () => {
-  const d = doll({ hair: "kid_straightbob", hairColor: "#c75c4a", face: "kid_f_smile", irisColor: "#3f6fa8", lipColor: "#d65a6e", glasses: "round_silver" });
-  assert.deepEqual(headParts(d), [
-    { name: "kid_f_smile_iris", tint: "#3f6fa8" },
-    { name: "kid_f_smile_lips", tint: "#d65a6e" },
-    "kid_f_smile_face",
-    { name: "kid_f_smile_brows", tint: "#9f4a3b" },
-    "kid_f_smile_mouth",
-    { name: "kid_straightbob_hair", tint: "#c75c4a" },
-    { name: "kid_atone_glasses", tint: "#d8d8d8" },
-  ]);
-});
-
-test("捲捲短髮（阿童那款）也照髮色染；溫柔的眼睛換瞳色、嘴巴擦口紅", () => {
-  const d = doll({ hair: "curly_short", hairColor: "#c75c4a", face: "gentle", mouth: "gentle", irisColor: "#3f6fa8", glasses: null });
-  assert.deepEqual(headParts(d), [
-    { name: "kid_f_atone_iris", tint: "#3f6fa8" },
-    { name: "kid_f_atone_lips", tint: "#e8a48c" },
-    "kid_f_atone_face",
-    { name: "kid_f_atone_brows", tint: "#9f4a3b" },
-    "kid_f_atone_mouth",
-    { name: "kid_atone_hair", tint: "#c75c4a" },
-  ]);
-});
-
 test("版本 5 的娃娃留著舊的捲髮鮑伯頭：換成同造型的捲捲短髮，其他不變", () => {
   const map = new Map([[DOLLS_KEY, JSON.stringify({ version: 5, dolls: [{ id: "a", name: "舊", body: "f", hair: "kid_bob", hairColor: "#c75c4a", worn: {}, colors: {} }, { id: "b", name: "長", body: "f", hair: "kid_long", worn: {}, colors: {} }], selected: "a" })]]);
   const storage = { getItem: (k) => map.get(k) ?? null, setItem: (k, v) => map.set(k, v) };
@@ -101,24 +75,7 @@ test("存檔帶版本號，讀回來一樣；沒有存檔就是空的", () => {
   assert.deepEqual(loadDolls(storage), { dolls, selected: dolls[0].id });
 });
 
-test("舊存檔的娃娃沒有口紅色：用預設的唇色", () => {
-  const d = doll({ face: "kid_f_smile", lipColor: undefined });
-  assert.deepEqual(headParts(d)[1], { name: "kid_f_smile_lips", tint: LIP_COLORS[0] });
-});
-
-test("眼睛和嘴巴分開挑：口紅跟著嘴巴走", () => {
-  const d = doll({ face: "kid_f_round", irisColor: "#3f6fa8", mouth: "kid_f_smile", lipColor: "#d65a6e", hair: null });
-  assert.deepEqual(headParts(d), [
-    { name: "kid_f_round_iris", tint: "#3f6fa8" },
-    { name: "kid_f_smile_lips", tint: "#d65a6e" },
-    "kid_f_round_face",
-    { name: "kid_f_round_brows", tint: "#2f221b" },
-    "kid_f_smile_mouth",
-  ]);
-});
-
-test("舊存檔沒選過嘴巴：配跟眼睛同一張圖的那款", () => {
-  const d = { ...doll({ face: "kid_m_cool", hair: null }), mouth: undefined };
-  assert.equal(headParts(d).at(-1), "kid_m_cool_mouth");
+test("新娃娃的預設嘴巴：那個素體的第一款", () => {
+  assert.equal(doll().mouth, "kid_f_smile");
   assert.equal(doll({ body: "m" }).mouth, "kid_m_smile");
 });

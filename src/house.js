@@ -1,11 +1,10 @@
 // 家：房間畫面裡的娃娃、家具、狗。畫面沿用小屋的 RoomView 與 Pets；娃娃的位置存在娃娃存檔，家具與房間交給遊戲存檔。
 // 畫面跟著「目前選取的娃娃」在哪一間房；同一間房的娃娃都畫出來。
 
+import { BODIES, headParts } from "../vendor/rules/looks.js";
 import { cuddleSpot, openCells, pillowSpot, seatAt } from "../vendor/rules/state.js";
 import { Pets } from "../vendor/web/pets.js";
 import { RoomView } from "../vendor/web/room-view.js";
-import { headParts } from "./dolls.js";
-import { BODIES } from "./looks.js";
 
 const $ = (id) => document.getElementById(id);
 const WAVE_MS = 3200;

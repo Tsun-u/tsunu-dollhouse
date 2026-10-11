@@ -1,14 +1,13 @@
 // 娃娃存檔：最多四個自己捏的娃娃（外型、衣服、所在位置）與目前選取誰。純邏輯，畫面在 creator.js、house.js。
 
 import { CATEGORY_SLOT } from "../vendor/web/dress.js";
+import { BODIES, FACES, HAIRS, MOUTHS, HAIR_COLORS, IRIS_COLORS, LIP_COLORS, SKIN_TONES } from "../vendor/rules/looks.js";
 import { MERGED_CLOTHES, SPLIT_CLOTHES } from "../vendor/rules/restore.js";
-import { BODIES, FACES, GLASSES, HAIRS, MOUTHS, HAIR_COLORS, IRIS_COLORS, LIP_COLORS, SKIN_TONES } from "./looks.js";
 
 export const DOLLS_KEY = "dollhouse.dolls";
 export const MAX_DOLLS = 4;
 const VERSION = 6;
 const START_SPOT = { room: "bedroom", x: 3, y: 4 };
-const BROW_SHADE = 0.8;   // 眉毛是髮色的幾倍亮
 
 export function createDoll({ name, body, ...looks }, newId = () => crypto.randomUUID()) {
   return {
@@ -41,29 +40,6 @@ export function updateDoll(dolls, id, changes) {
 
 export function randomShopkeeper(dolls, rand = Math.random) {
   return dolls[Math.min(dolls.length - 1, Math.floor(rand() * dolls.length))] ?? null;
-}
-
-/** 頭部零件交給播放器的順序：瞳孔、唇色墊最底下 → 眼睛 → 眉毛 → 嘴巴 → 頭髮 → 眼鏡。能染色的帶 tint。
- *  舊存檔沒選過嘴巴，配跟眼睛同一張圖的那款；沒有口紅色，用自然唇色。 */
-export function headParts(doll) {
-  const face = FACES.find((option) => option.id === doll.face);
-  const mouth = MOUTHS.find((option) => option.id === (doll.mouth ?? doll.face));
-  const hair = HAIRS.find((option) => option.id === doll.hair);
-  const glasses = GLASSES.find((option) => option.id === doll.glasses);
-  return [
-    ...(face?.iris ? [{ name: face.iris, tint: doll.irisColor }] : []),
-    ...(mouth?.lips ? [{ name: mouth.lips, tint: doll.lipColor ?? LIP_COLORS[0] }] : []),
-    ...(face ? [face.face] : []),
-    ...(face?.brows ? [{ name: face.brows, tint: browColor(doll.hairColor) }] : []),
-    ...(mouth ? [mouth.mouth] : []),
-    ...(hair ? [{ name: hair.outfit, tint: doll.hairColor }] : []),
-    ...(glasses ? [{ name: glasses.outfit, tint: glasses.tint }] : []),
-  ];
-}
-
-/** 眉毛的顏色：比髮色暗一階。 */
-function browColor(hairColor) {
-  return "#" + [1, 3, 5].map((i) => Math.round(parseInt(hairColor.slice(i, i + 2), 16) * BROW_SHADE).toString(16).padStart(2, "0")).join("");
 }
 
 /** 拿掉的套裝拆成單件灰稿（SPLIT_CLOTHES）升到 version：每件照大類穿進空著的格子，沒染過的顏色維持原本的。 */
