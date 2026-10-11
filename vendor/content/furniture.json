@@ -1,0 +1,532 @@
+{
+ "rug_large": {
+  "label": "大地毯",
+  "dye": true,
+  "w": 6,
+  "d": 4,
+  "height": 0.05,
+  "color": "#d9a3a3",
+  "price": 400,
+  "image": "assets/furniture/rug_large.png",
+  "anchor": {
+   "x": 902,
+   "y": 914,
+   "width": 1282
+  },
+  "floor": true
+ },
+ "kitchen_island": {
+  "label": "中島",
+  "w": 2,
+  "d": 1,
+  "height": 0.9,
+  "color": "#c9a06a",
+  "price": 320,
+  "image": "assets/furniture/kitchen_island.png",
+  "anchor": {
+   "x": 631,
+   "y": 664,
+   "width": 354
+  },
+  "table": true
+ },
+ "bath_mat": {
+  "label": "腳踏墊",
+  "dye": true,
+  "w": 2,
+  "d": 1,
+  "height": 0.03,
+  "color": "#e8b4b8",
+  "price": 80,
+  "image": "assets/furniture/bath_mat.png",
+  "anchor": {
+   "x": 785,
+   "y": 828,
+   "width": 477
+  },
+  "floor": true
+ },
+ "mirror": {
+  "label": "鏡子",
+  "w": 1,
+  "d": 1,
+  "height": 0.6,
+  "color": "#dfe9ef",
+  "price": 150,
+  "onWall": true,
+  "mirror": true
+ },
+ "kitchen_cabinet": {
+  "label": "櫥櫃",
+  "w": 2,
+  "d": 1,
+  "height": 0.9,
+  "color": "#d9b07a",
+  "price": 300,
+  "image": "assets/furniture/kitchen_cabinet.png",
+  "anchor": {
+   "x": 576,
+   "y": 900,
+   "width": 384
+  },
+  "table": true
+ },
+ "kitchen_counter": {
+  "label": "流理台",
+  "w": 2,
+  "d": 1,
+  "height": 0.9,
+  "color": "#c9a06a",
+  "price": 360,
+  "image": "assets/furniture/kitchen_counter.png",
+  "anchor": {
+   "x": 784,
+   "y": 838,
+   "width": 471
+  }
+ },
+ "stove": {
+  "label": "爐台",
+  "stove": true,
+  "w": 1,
+  "d": 1,
+  "height": 0.9,
+  "color": "#c9a06a",
+  "price": 380,
+  "image": "assets/furniture/stove.png",
+  "anchor": {
+   "x": 681,
+   "y": 835,
+   "width": 318
+  }
+ },
+ "fridge": {
+  "label": "冰箱",
+  "w": 1,
+  "d": 1,
+  "height": 1.9,
+  "color": "#f2e6c8",
+  "price": 480,
+  "image": "assets/furniture/fridge.png",
+  "anchor": {
+   "x": 627,
+   "y": 875,
+   "width": 318
+  }
+ },
+ "low_bookshelf": {
+  "label": "矮書櫃",
+  "w": 2,
+  "d": 1,
+  "height": 0.9,
+  "color": "#d9a760",
+  "price": 250,
+  "image": "assets/furniture/low_bookshelf.png",
+  "anchor": {
+   "x": 610,
+   "y": 856,
+   "width": 827
+  },
+  "readable": true
+ },
+ "nightstand": {
+  "label": "床頭櫃",
+  "w": 1,
+  "d": 1,
+  "height": 0.7,
+  "color": "#d9a760",
+  "price": 150,
+  "image": "assets/furniture/nightstand.png",
+  "anchor": {
+   "x": 390,
+   "y": 789,
+   "width": 719
+  }
+ },
+ "sofa": {
+  "label": "沙發",
+  "dogNap": true,
+  "w": 2,
+  "d": 1,
+  "height": 1.0,
+  "color": "#c97b63",
+  "price": 240,
+  "image": "assets/furniture/sofa.png",
+  "imageAlongDepth": true,
+  "seat": true
+ },
+ "table": {
+  "label": "小桌",
+  "w": 1,
+  "d": 1,
+  "height": 0.8,
+  "color": "#b08a5a",
+  "price": 90,
+  "image": "assets/furniture/table.png",
+  "table": true
+ },
+ "bed": {
+  "label": "床",
+  "dogNap": true,
+  "w": 2,
+  "d": 3,
+  "height": 0.7,
+  "color": "#d9a760",
+  "price": 400,
+  "image": "assets/furniture/bed.png",
+  "blanket": "assets/furniture/bed_blanket.png",
+  "dye": true,
+  "anchor": {
+   "x": 386,
+   "y": 515,
+   "width": 610
+  },
+  "seat": true,
+  "seatPose": "lounge"
+ },
+ "bookshelf": {
+  "label": "書櫃",
+  "w": 2,
+  "d": 1,
+  "height": 2.2,
+  "color": "#7a5a3a",
+  "price": 260,
+  "image": "assets/furniture/bookshelf.png",
+  "anchor": {
+   "x": 640,
+   "y": 712,
+   "width": 384
+  },
+  "readable": true
+ },
+ "plant": {
+  "label": "盆栽",
+  "size": 0.65,
+  "w": 1,
+  "d": 1,
+  "height": 1.4,
+  "color": "#5f9e5a",
+  "price": 60,
+  "image": "assets/furniture/plant.png",
+  "plant": true
+ },
+ "lamp": {
+  "label": "立燈",
+  "size": 0.72,
+  "w": 1,
+  "d": 1,
+  "height": 1.8,
+  "color": "#e6c96b",
+  "price": 120,
+  "image": "assets/furniture/lamp.png",
+  "switch": true
+ },
+ "rug": {
+  "label": "地毯",
+  "dye": true,
+  "w": 3,
+  "d": 2,
+  "height": 0.05,
+  "color": "#d9a3a3",
+  "price": 150,
+  "image": "assets/furniture/rug.png",
+  "floor": true
+ },
+ "dogbed": {
+  "label": "狗窩",
+  "w": 1,
+  "d": 1,
+  "height": 0.4,
+  "color": "#9c8a76",
+  "price": 80,
+  "image": "assets/furniture/dogbed.png",
+  "pet": true
+ },
+ "dogbowl": {
+  "label": "狗碗",
+  "w": 1,
+  "d": 1,
+  "height": 0.2,
+  "color": "#d98c6a",
+  "price": 40,
+  "image": "assets/furniture/dogbowl.png",
+  "anchor": {
+   "x": 512,
+   "y": 704,
+   "width": 261
+  },
+  "bowl": true
+ },
+ "snack_cabinet": {
+  "label": "零食櫃",
+  "w": 1,
+  "d": 1,
+  "height": 1.2,
+  "color": "#c49a60",
+  "price": 180,
+  "image": "assets/furniture/snack_cabinet.png",
+  "anchor": {
+   "x": 512,
+   "y": 681,
+   "width": 258
+  },
+  "snacks": true
+ },
+ "bed_double": {
+  "label": "雙人床",
+  "dogNap": true,
+  "w": 3,
+  "d": 3,
+  "height": 0.7,
+  "color": "#7f9fd1",
+  "price": 700,
+  "image": "assets/furniture/bed_double.png",
+  "blanket": "assets/furniture/bed_double_blanket.png",
+  "dye": true,
+  "anchor": {
+   "x": 512,
+   "y": 900,
+   "width": 768
+  },
+  "seat": true,
+  "seatPose": "lounge"
+ },
+ "chair": {
+  "label": "餐椅",
+  "w": 1,
+  "d": 1,
+  "height": 1.0,
+  "color": "#c89a5a",
+  "price": 90,
+  "image": "assets/furniture/chair.png",
+  "seat": true,
+  "size": 0.9,
+  "sitDrop": 6.5,
+  "anchor": {
+   "x": 515,
+   "y": 667,
+   "width": 257
+  },
+  "back": {
+   "image": "assets/furniture/chair_back.png",
+   "anchor": {
+    "x": 513,
+    "y": 666,
+    "width": 254
+   },
+   "front": "assets/furniture/chair_back_front.png",
+   "legsUnder": true,
+   "sitShift": 8,
+   "sitDrop": -3.5
+  }
+ },
+ "desk": {
+  "label": "書桌",
+  "w": 2,
+  "d": 1,
+  "height": 0.9,
+  "color": "#b98a52",
+  "price": 320,
+  "image": "assets/furniture/desk.png",
+  "anchor": {
+   "x": 651,
+   "y": 688,
+   "width": 424
+  },
+  "table": true
+ },
+ "wardrobe": {
+  "label": "衣櫃",
+  "w": 1,
+  "d": 2,
+  "height": 2.2,
+  "color": "#c49a60",
+  "price": 420,
+  "image": "assets/furniture/wardrobe.png",
+  "anchor": {
+   "x": 414,
+   "y": 761,
+   "width": 445
+  }
+ },
+ "tv": {
+  "label": "電視櫃",
+  "w": 2,
+  "d": 1,
+  "height": 1.1,
+  "color": "#b48a55",
+  "price": 480,
+  "image": "assets/furniture/tv.png",
+  "anchor": {
+   "x": 675,
+   "y": 689,
+   "width": 390
+  }
+ },
+ "dining_table": {
+  "label": "餐桌",
+  "w": 2,
+  "d": 2,
+  "height": 0.8,
+  "color": "#b98a52",
+  "price": 360,
+  "table": true,
+  "image": "assets/furniture/dining_table.png",
+  "anchor": {
+   "x": 512,
+   "y": 713,
+   "width": 513
+  }
+ },
+ "sofa_large": {
+  "label": "三人沙發",
+  "dogNap": true,
+  "w": 1,
+  "d": 4,
+  "height": 0.9,
+  "color": "#e3d5bf",
+  "price": 450,
+  "image": "assets/furniture/sofa_large.png",
+  "anchor": {
+   "x": 382,
+   "y": 728,
+   "width": 560
+  },
+  "seat": true,
+  "back": {
+   "image": "assets/furniture/sofa_large_back.png",
+   "front": "assets/furniture/sofa_large_back_front.png",
+   "anchor": {
+    "x": 397,
+    "y": 688,
+    "width": 511
+   },
+   "sitShift": -12
+  },
+  "dye": true
+ },
+ "coffee_table": {
+  "label": "茶几",
+  "w": 2,
+  "d": 1,
+  "height": 0.45,
+  "color": "#d49a55",
+  "price": 180,
+  "image": "assets/furniture/coffee_table.png",
+  "anchor": {
+   "x": 638,
+   "y": 710,
+   "width": 387
+  },
+  "table": true
+ },
+ "armchair": {
+  "label": "單人扶手椅",
+  "dogNap": true,
+  "w": 1,
+  "d": 1,
+  "height": 1.0,
+  "color": "#e3d5bf",
+  "price": 200,
+  "image": "assets/furniture/armchair.png",
+  "anchor": {
+   "x": 513,
+   "y": 711,
+   "width": 256
+  },
+  "seat": true,
+  "back": {
+   "image": "assets/furniture/armchair_back.png",
+   "front": "assets/furniture/armchair_back_front.png",
+   "anchor": {
+    "x": 510,
+    "y": 713,
+    "width": 256
+   },
+   "sitDrop": 6
+  },
+  "dye": true
+ },
+ "toilet": {
+  "label": "馬桶",
+  "size": 0.55,
+  "w": 1,
+  "d": 1,
+  "height": 0.9,
+  "color": "#f2efe8",
+  "price": 260,
+  "image": "assets/furniture/toilet.png",
+  "anchor": {
+   "x": 511,
+   "y": 713,
+   "width": 256
+  }
+ },
+ "bathtub": {
+  "label": "浴缸",
+  "size": 1.15,
+  "w": 2,
+  "d": 1,
+  "height": 0.7,
+  "color": "#f4f1ea",
+  "price": 520,
+  "image": "assets/furniture/bathtub.png",
+  "anchor": {
+   "x": 514,
+   "y": 587,
+   "width": 419
+  },
+  "seat": true,
+  "seatPose": "bathe",
+  "front": "assets/furniture/bathtub_front.png",
+  "sitDrop": 20,
+  "facingSitDrop": 26
+ },
+ "shower": {
+  "label": "淋浴間",
+  "w": 1,
+  "d": 1,
+  "height": 2.4,
+  "color": "#e6eef2",
+  "price": 480,
+  "image": "assets/furniture/shower.png",
+  "anchor": {
+   "x": 627,
+   "y": 873,
+   "width": 321
+  },
+  "seat": true,
+  "seatPose": "shower",
+  "sitDrop": 0
+ },
+ "sink": {
+  "label": "洗手台",
+  "washbasin": true,
+  "w": 1,
+  "d": 1,
+  "height": 1.0,
+  "color": "#d49a55",
+  "price": 280,
+  "image": "assets/furniture/sink.png",
+  "anchor": {
+   "x": 513,
+   "y": 609,
+   "width": 256
+  }
+ },
+ "window": {
+  "label": "窗戶",
+  "w": 3,
+  "d": 1,
+  "height": 1.2,
+  "color": "#bcd8e8",
+  "price": 350,
+  "image": "assets/furniture/window.png",
+  "anchor": {
+   "x": 140,
+   "y": 685,
+   "width": 384
+  },
+  "onWall": true
+ }
+}

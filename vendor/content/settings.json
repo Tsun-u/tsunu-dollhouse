@@ -1,0 +1,7 @@
+{
+ "stamina": {
+  "enabled": true,
+  "max": 5,
+  "regenMinutes": 20
+ }
+}

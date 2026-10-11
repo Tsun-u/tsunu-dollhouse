@@ -1,0 +1,140 @@
+{
+ "tee_gray": {
+  "label": "T 恤",
+  "category": "tee",
+  "color": "#b9b9b9",
+  "price": 90
+ },
+ "shirt_gray": {
+  "label": "襯衫",
+  "category": "shirt",
+  "color": "#b9b9b9",
+  "price": 130,
+  "tucked": true
+ },
+ "pants_gray": {
+  "label": "長褲",
+  "category": "pants",
+  "color": "#b9b9b9",
+  "price": 120,
+  "wearers": [
+   "tsunu"
+  ]
+ },
+ "shoes_gray": {
+  "label": "帆布鞋",
+  "category": "shoes",
+  "color": "#b9b9b9",
+  "price": 60,
+  "sprites": {
+   "atone": "shoes",
+   "tsunu": "shoes"
+  },
+  "dye": true
+ },
+ "dress_gray": {
+  "label": "洋裝",
+  "category": "dress",
+  "color": "#b9b9b9",
+  "price": 110,
+  "wearers": [
+   "atone"
+  ]
+ },
+ "coat_camel": {
+  "label": "外套",
+  "category": "coat",
+  "color": "#c8a070",
+  "price": 260
+ },
+ "cardigan_gray": {
+  "label": "開襟針織外套",
+  "category": "coat",
+  "color": "#b9b9b9",
+  "price": 120
+ },
+ "jeans_shorts": {
+  "label": "牛仔短褲",
+  "category": "shorts",
+  "color": "#4b586c",
+  "price": 80
+ },
+ "pinafore_gray": {
+  "label": "背心裙",
+  "category": "pinafore",
+  "color": "#b9b9b9",
+  "price": 140,
+  "wearers": [
+   "atone"
+  ]
+ },
+ "tank_gray": {
+  "label": "背心",
+  "category": "tank",
+  "color": "#b9b9b9",
+  "price": 80
+ },
+ "skirt_gray": {
+  "label": "百褶裙",
+  "category": "skirt",
+  "color": "#b9b9b9",
+  "price": 100,
+  "wearers": [
+   "atone"
+  ]
+ },
+ "overalls_gray": {
+  "label": "吊帶褲",
+  "category": "overalls",
+  "color": "#b9b9b9",
+  "price": 150,
+  "wearers": [
+   "tsunu"
+  ]
+ },
+ "bowtie_gray": {
+  "label": "蝴蝶結",
+  "category": "bowtie",
+  "color": "#b9b9b9",
+  "price": 50
+ },
+ "tie_gray": {
+  "label": "領帶",
+  "category": "tie",
+  "color": "#b9b9b9",
+  "price": 60,
+  "wearers": [
+   "tsunu"
+  ]
+ },
+ "hoodie_gray": {
+  "label": "帽 T",
+  "category": "hoodie",
+  "color": "#b9b9b9",
+  "price": 150,
+  "wearers": [
+   "tsunu"
+  ],
+  "parts": [
+   {
+    "template": "tee",
+    "bones": [
+     "upper_arm_l",
+     "upper_arm_r"
+    ]
+   },
+   {
+    "template": "hood"
+   }
+  ]
+ },
+ "wide_pants_gray": {
+  "label": "七分寬褲",
+  "category": "wide_pants",
+  "color": "#b9b9b9",
+  "price": 130,
+  "wearers": [
+   "tsunu"
+  ]
+ }
+}

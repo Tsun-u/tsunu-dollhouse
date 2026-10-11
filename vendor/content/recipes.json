@@ -1,0 +1,225 @@
+{
+ "bean": {
+  "label": "咖啡豆",
+  "tiers": [
+   "咖啡豆",
+   "烘焙豆",
+   "咖啡粉",
+   "手沖咖啡"
+  ],
+  "price": 95,
+  "temp": "hot",
+  "row": 0
+ },
+ "milk": {
+  "label": "牛奶",
+  "tiers": [
+   "牛奶",
+   "奶泡",
+   "拿鐵"
+  ],
+  "price": 45,
+  "temp": "hot",
+  "row": 1
+ },
+ "sugar": {
+  "label": "糖",
+  "tiers": [
+   "糖",
+   "糖漿",
+   "焦糖布丁"
+  ],
+  "price": 40,
+  "temp": "cold",
+  "row": 2
+ },
+ "flour": {
+  "label": "麵粉",
+  "tiers": [
+   "麵粉",
+   "麵團",
+   "司康"
+  ],
+  "price": 35,
+  "temp": "hot",
+  "row": 3
+ },
+ "fruit": {
+  "label": "水果",
+  "tiers": [
+   "水果",
+   "果醬",
+   "水果塔"
+  ],
+  "price": 50,
+  "temp": "cold",
+  "row": 4
+ },
+ "flower": {
+  "label": "花",
+  "tiers": [
+   "花",
+   "花束",
+   "花茶"
+  ],
+  "price": 35,
+  "temp": "hot",
+  "row": 5
+ },
+ "rice": {
+  "label": "米",
+  "tiers": [
+   "米",
+   "飯糰",
+   "便當"
+  ],
+  "price": 45,
+  "temp": "hot",
+  "shop": "grocery",
+  "sheet": "street",
+  "row": 0
+ },
+ "egg": {
+  "label": "蛋",
+  "tiers": [
+   "蛋",
+   "水煮蛋",
+   "茶葉蛋"
+  ],
+  "price": 35,
+  "temp": "hot",
+  "shop": "grocery",
+  "sheet": "street",
+  "row": 1
+ },
+ "tealeaf": {
+  "label": "茶葉",
+  "tiers": [
+   "茶葉",
+   "茶包",
+   "罐裝紅茶"
+  ],
+  "price": 40,
+  "temp": "cold",
+  "shop": "grocery",
+  "sheet": "street",
+  "row": 2
+ },
+ "candy": {
+  "label": "糖果",
+  "tiers": [
+   "糖果",
+   "一袋糖果",
+   "零食禮盒",
+   "年貨大禮包"
+  ],
+  "price": 95,
+  "temp": "room",
+  "shop": "grocery",
+  "sheet": "street",
+  "row": 3
+ },
+ "cotton": {
+  "label": "棉花",
+  "tiers": [
+   "棉花",
+   "棉線",
+   "棉布",
+   "T 恤"
+  ],
+  "price": 90,
+  "temp": "room",
+  "shop": "boutique",
+  "clothes": "tee_gray",
+  "sheet": "street",
+  "row": 4
+ },
+ "linen": {
+  "label": "麻",
+  "tiers": [
+   "麻",
+   "麻線",
+   "麻布",
+   "洋裝"
+  ],
+  "price": 110,
+  "temp": "room",
+  "shop": "boutique",
+  "clothes": "dress_gray",
+  "sheet": "street",
+  "row": 5
+ },
+ "wool": {
+  "label": "羊毛",
+  "tiers": [
+   "羊毛",
+   "毛線",
+   "織片",
+   "開襟針織外套"
+  ],
+  "price": 100,
+  "temp": "room",
+  "shop": "boutique",
+  "clothes": "cardigan_gray",
+  "sheet": "street",
+  "row": 6
+ },
+ "button": {
+  "label": "鈕扣",
+  "tiers": [
+   "鈕扣",
+   "一排鈕扣",
+   "襯衫前襟",
+   "襯衫"
+  ],
+  "price": 100,
+  "temp": "room",
+  "shop": "boutique",
+  "clothes": "shirt_gray",
+  "sheet": "street",
+  "row": 7
+ },
+ "denim": {
+  "label": "靛藍",
+  "tiers": [
+   "靛藍",
+   "丹寧線",
+   "丹寧布",
+   "背心裙"
+  ],
+  "price": 105,
+  "temp": "room",
+  "shop": "boutique",
+  "clothes": "pinafore_gray",
+  "sheet": "street",
+  "row": 8
+ },
+ "silk": {
+  "label": "蠶絲",
+  "tiers": [
+   "蠶絲",
+   "絲線",
+   "緞布",
+   "蝴蝶結"
+  ],
+  "price": 110,
+  "temp": "room",
+  "shop": "boutique",
+  "clothes": "bowtie_gray",
+  "sheet": "street",
+  "row": 9
+ },
+ "wheat": {
+  "label": "小麥",
+  "tiers": [
+   "小麥",
+   "麵條",
+   "泡麵"
+  ],
+  "price": 40,
+  "temp": "hot",
+  "shop": "grocery",
+  "sheet": "street",
+  "row": 10
+ }
+}

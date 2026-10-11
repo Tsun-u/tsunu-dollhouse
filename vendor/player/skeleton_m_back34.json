@@ -1,0 +1,383 @@
+{
+ "canvas": {
+  "w": 1024,
+  "h": 1536
+ },
+ "view": "back34",
+ "forward": 1,
+ "root": "torso",
+ "bones": [
+  {
+   "name": "upper_arm_r",
+   "parent": "torso",
+   "pivot": [
+    569.9,
+    452.7
+   ],
+   "slots": [
+    "m_back34_skin_upper_arm_r.png"
+   ]
+  },
+  {
+   "name": "lower_arm_r",
+   "parent": "upper_arm_r",
+   "pivot": [
+    628.2,
+    578.7
+   ],
+   "slots": [
+    "m_back34_skin_lower_arm_r.png"
+   ]
+  },
+  {
+   "name": "hand_r",
+   "parent": "lower_arm_r",
+   "pivot": [
+    692.3,
+    760.8
+   ],
+   "slots": [
+    "m_back34_skin_hand_r.png"
+   ]
+  },
+  {
+   "name": "upper_leg_r",
+   "parent": "torso",
+   "pivot": [
+    550,
+    700
+   ],
+   "slots": [
+    "m_back34_skin_upper_leg_r.png",
+    "m_back34_underwear_upper_leg_r.png"
+   ]
+  },
+  {
+   "name": "lower_leg_r",
+   "parent": "upper_leg_r",
+   "pivot": [
+    570,
+    996.7
+   ],
+   "slots": [
+    "m_back34_skin_lower_leg_r.png"
+   ]
+  },
+  {
+   "name": "foot_r",
+   "parent": "lower_leg_r",
+   "pivot": [
+    560.8,
+    1362.9
+   ],
+   "slots": [
+    "m_back34_skin_foot_r.png"
+   ]
+  },
+  {
+   "name": "head",
+   "parent": "torso",
+   "pivot": [
+    514.6,
+    319.4
+   ],
+   "slots": [
+    "m_back34_skin_head.png"
+   ],
+   "scale": 0.9
+  },
+  {
+   "name": "torso",
+   "parent": null,
+   "pivot": [
+    497.4,
+    716.2
+   ],
+   "slots": [
+    "m_back34_skin_torso.png",
+    "m_back34_underwear_torso.png"
+   ]
+  },
+  {
+   "name": "upper_leg_l",
+   "parent": "torso",
+   "pivot": [
+    463.6,
+    724.8
+   ],
+   "slots": [
+    "m_back34_skin_upper_leg_l.png",
+    "m_back34_underwear_upper_leg_l.png"
+   ]
+  },
+  {
+   "name": "lower_leg_l",
+   "parent": "upper_leg_l",
+   "pivot": [
+    483.3,
+    1000
+   ],
+   "slots": [
+    "m_back34_skin_lower_leg_l.png"
+   ]
+  },
+  {
+   "name": "foot_l",
+   "parent": "lower_leg_l",
+   "pivot": [
+    475.9,
+    1367.4
+   ],
+   "slots": [
+    "m_back34_skin_foot_l.png"
+   ]
+  },
+  {
+   "name": "upper_arm_l",
+   "parent": "torso",
+   "pivot": [
+    461.0,
+    440.4
+   ],
+   "slots": [
+    "m_back34_skin_upper_arm_l.png"
+   ]
+  },
+  {
+   "name": "lower_arm_l",
+   "parent": "upper_arm_l",
+   "pivot": [
+    380,
+    586.7
+   ],
+   "slots": [
+    "m_back34_skin_lower_arm_l.png"
+   ]
+  },
+  {
+   "name": "hand_l",
+   "parent": "lower_arm_l",
+   "pivot": [
+    334.0,
+    771.0
+   ],
+   "slots": [
+    "m_back34_skin_hand_l.png"
+   ]
+  }
+ ],
+ "zOrder": [
+  "upper_arm_r",
+  "lower_arm_r",
+  "hand_r",
+  "upper_leg_r",
+  "lower_leg_r",
+  "foot_r",
+  "head",
+  "torso",
+  "upper_leg_l",
+  "lower_leg_l",
+  "foot_l",
+  "upper_arm_l",
+  "lower_arm_l",
+  "hand_l"
+ ],
+ "outfits": {
+  "tpl_shirt": {
+   "upper_arm_r": [
+    "m_back34_tpl_shirt_upper_arm_r.png"
+   ],
+   "torso": [
+    "m_back34_tpl_shirt_torso.png"
+   ],
+   "upper_arm_l": [
+    "m_back34_tpl_shirt_upper_arm_l.png"
+   ],
+   "torso:armhole": [
+    "m_back34_tpl_shirt_armhole.png"
+   ],
+   "torso:tuck": [
+    "m_back34_tpl_shirt_tuck.png"
+   ]
+  },
+  "kid_short_hair": {
+   "head": [
+    "m_back34_kid_short_hair.png"
+   ]
+  },
+  "kid_wavy_hair": {
+   "head": [
+    "m_back34_kid_wavy_hair.png"
+   ]
+  },
+  "kid_spiky_hair": {
+   "head": [
+    "m_back34_kid_spiky_hair.png"
+   ]
+  },
+  "kid_sidepart_hair": {
+   "head": [
+    "m_back34_kid_sidepart_hair.png"
+   ]
+  },
+  "kid_buzz_hair": {
+   "head": [
+    "m_back34_kid_buzz_hair.png"
+   ]
+  },
+  "kid_curly_hair": {
+   "head": [
+    "m_back34_kid_curly_hair.png"
+   ]
+  },
+  "shoes": {
+   "foot_r": [
+    "m_back34_shoes_foot_r.png"
+   ],
+   "foot_l": [
+    "m_back34_shoes_foot_l.png"
+   ]
+  },
+  "tpl_pants": {
+   "upper_leg_r": [
+    "m_back34_tpl_pants_upper_leg_r.png"
+   ],
+   "lower_leg_r": [
+    "m_back34_tpl_pants_lower_leg_r.png"
+   ],
+   "torso": [
+    "m_back34_tpl_pants_torso.png"
+   ],
+   "upper_leg_l": [
+    "m_back34_tpl_pants_upper_leg_l.png"
+   ],
+   "lower_leg_l": [
+    "m_back34_tpl_pants_lower_leg_l.png"
+   ]
+  },
+  "tpl_tee": {
+   "upper_arm_r": [
+    "m_back34_tpl_tee_upper_arm_r.png"
+   ],
+   "torso": [
+    "m_back34_tpl_tee_torso.png"
+   ],
+   "upper_arm_l": [
+    "m_back34_tpl_tee_upper_arm_l.png"
+   ],
+   "torso:armhole": [
+    "m_back34_tpl_tee_armhole.png"
+   ]
+  },
+  "tpl_tank": {
+   "torso": [
+    "m_back34_tpl_tank_torso.png"
+   ]
+  },
+  "tpl_shorts": {
+   "upper_leg_r": [
+    "m_back34_tpl_shorts_upper_leg_r.png"
+   ],
+   "torso": [
+    "m_back34_tpl_shorts_torso.png"
+   ],
+   "upper_leg_l": [
+    "m_back34_tpl_shorts_upper_leg_l.png"
+   ]
+  },
+  "tpl_coat": {
+   "upper_arm_r": [
+    "m_back34_tpl_coat_upper_arm_r.png"
+   ],
+   "lower_arm_r": [
+    "m_back34_tpl_coat_lower_arm_r.png"
+   ],
+   "torso": [
+    "m_back34_tpl_coat_torso.png"
+   ],
+   "upper_arm_l": [
+    "m_back34_tpl_coat_upper_arm_l.png"
+   ],
+   "lower_arm_l": [
+    "m_back34_tpl_coat_lower_arm_l.png"
+   ],
+   "torso:armhole": [
+    "m_back34_tpl_coat_armhole.png"
+   ]
+  },
+  "tpl_overalls": {
+   "upper_leg_r": [
+    "m_back34_tpl_overalls_upper_leg_r.png"
+   ],
+   "lower_leg_r": [
+    "m_back34_tpl_overalls_lower_leg_r.png"
+   ],
+   "torso": [
+    "m_back34_tpl_overalls_torso.png"
+   ],
+   "upper_leg_l": [
+    "m_back34_tpl_overalls_upper_leg_l.png"
+   ],
+   "lower_leg_l": [
+    "m_back34_tpl_overalls_lower_leg_l.png"
+   ]
+  },
+  "tpl_bowtie": {},
+  "tpl_tie": {},
+  "tpl_hoodie": {
+   "torso": [
+    "m_back34_tpl_hoodie_torso.png"
+   ],
+   "torso:armhole": [
+    "m_back34_tpl_hoodie_armhole.png"
+   ]
+  },
+  "tpl_wide_pants": {
+   "upper_leg_r": [
+    "m_back34_tpl_wide_pants_upper_leg_r.png"
+   ],
+   "lower_leg_r": [
+    "m_back34_tpl_wide_pants_lower_leg_r.png"
+   ],
+   "torso": [
+    "m_back34_tpl_wide_pants_torso.png"
+   ],
+   "upper_leg_l": [
+    "m_back34_tpl_wide_pants_upper_leg_l.png"
+   ],
+   "lower_leg_l": [
+    "m_back34_tpl_wide_pants_lower_leg_l.png"
+   ]
+  },
+  "tpl_hood": {
+   "torso": [
+    "m_back34_tpl_hood_torso.png"
+   ]
+  },
+  "kid_tsunu_hair": {
+   "head": [
+    "m_back34_kid_tsunu_hair.png"
+   ]
+  }
+ },
+ "scale": 1.05,
+ "garmentAfter": {
+  "head": "torso"
+ },
+ "skinGray": true,
+ "skinBase": 0.6724,
+ "outfitAfter": {
+  "tpl_tee": {
+   "torso": "foot_l"
+  },
+  "tpl_tank": {
+   "torso": "foot_l"
+  },
+  "tpl_coat": {
+   "torso": "upper_leg_l"
+  },
+  "tpl_hoodie": {
+   "torso": "foot_l"
+  }
+ }
+}

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>小屋娃娃屋</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div id="loading" role="status">
+  <strong>小屋娃娃屋</strong>
+  <p>準備中<span class="dots"><i>.</i><i>.</i><i>.</i></span></p>
+</div>
+<script>
+  // 載入畫面還在時出錯（網路斷了、素材載不到）：改成請玩家重新整理，不要一直轉
+  addEventListener("error", () => {
+    const loading = document.getElementById("loading");
+    if (loading && !loading.classList.contains("done")) loading.querySelector("p").textContent = "沒有載入成功，請重新整理再試一次。";
+  });
+</script>
+<main id="app">
+  <header id="top">
+    <nav id="tabs">
+      <button data-tab="home" class="on">家</button>
+      <button data-tab="puzzle">三消</button>
+      <button data-tab="workshop">工坊</button>
+      <button data-tab="closet">衣櫃</button>
+      <button data-tab="cafe">咖啡廳</button>
+      <button data-tab="shop">家具店</button>
+      <button data-tab="dolls">娃娃</button>
+    </nav>
+    <div id="status"><span id="money"></span><span id="currentDoll"></span></div>
+  </header>
+
+  <section id="home" class="tab on">
+    <div id="roomTabs" class="chips"></div>
+    <div id="toolbar">
+      <span id="pieceActions"></span>
+      <button id="flipBtn" disabled>轉向</button>
+      <button id="storeBtn" disabled>收回倉庫</button>
+    </div>
+    <canvas id="room"></canvas>
+    <div id="dollPanel" hidden>
+      <div class="panel-head"><span id="dollPanelTitle"></span></div>
+      <div id="dollActions" class="chips"></div>
+    </div>
+    <div id="dogPanel" hidden>
+      <div class="panel-head"><span id="dogTitle"></span><button id="dogClose">收起</button></div>
+      <div id="dogActions" class="chips"></div>
+    </div>
+    <div class="panel-head"><span>倉庫（點一下家具，再點房間的地板放下去）</span></div>
+    <div id="inventory" class="chips"></div>
+  </section>
+
+  <section id="closet" class="tab">
+    <div class="panel-head"><span>幫誰換衣服</span><span id="closetWho" class="chips"></span></div>
+    <div id="closetBody">
+      <canvas id="closetCanvas"></canvas>
+      <div id="wardrobe" class="chips"></div>
+    </div>
+  </section>
+
+  <section id="puzzle" class="tab">
+    <div class="panel-head"><span id="puzzleInfo"></span><span><button id="puzzleCoop" hidden>一起玩</button> <button id="puzzleStart">開一盤</button></span></div>
+    <div id="board"></div>
+  </section>
+
+  <section id="workshop" class="tab">
+    <div class="panel-head"><span>材料：點一下放進工坊</span></div>
+    <div id="materials" class="chips"></div>
+    <div id="grid"></div>
+    <div class="panel-head"><span>做好的商品</span></div>
+    <div id="products" class="chips"></div>
+  </section>
+
+  <section id="cafe" class="tab">
+    <div class="panel-head"><span id="cafeInfo"></span><button id="cafeToggle"></button></div>
+    <canvas id="cafeCanvas"></canvas>
+    <div class="panel-head"><span>櫃台上的商品（點客人就出餐）</span></div>
+    <div id="cafeProducts" class="chips"></div>
+  </section>
+
+  <section id="shop" class="tab">
+    <div class="panel-head"><span id="shopMoney"></span></div>
+    <div id="shopList" class="chips"></div>
+    <div class="panel-head"><span>蓋房間</span></div>
+    <div id="buildList" class="chips"></div>
+    <div class="panel-head"><span>衣服（買到的進衣櫃）</span></div>
+    <div id="clothesShop" class="chips"></div>
+    <div class="panel-head"><span>倉庫裡的家具（點一下賣回，半價）</span></div>
+    <div id="resaleList" class="chips"></div>
+  </section>
+
+  <section id="dolls" class="tab">
+    <div class="panel-head"><span id="dollsInfo"></span><button id="addDoll">新增娃娃</button></div>
+    <div id="dollList"></div>
+    <div id="creatorBox" hidden>
+      <div class="panel-head"><span id="creatorTitle"></span><span><button id="creatorCancel">取消</button> <button id="creatorSave">好了</button></span></div>
+      <div id="creator">
+        <canvas id="creatorCanvas"></canvas>
+        <div id="creatorOptions"></div>
+      </div>
+    </div>
+    <div id="saveBox">
+      <button id="exportSave">匯出存檔</button>
+      <label class="item"><input id="importSave" type="file" accept="application/json" hidden>匯入存檔</label>
+      <button id="cloudSave">存到雲端</button>
+      <button id="cloudLoad">從雲端取回</button>
+      <span id="saveInfo"></span>
+    </div>
+  </section>
+</main>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

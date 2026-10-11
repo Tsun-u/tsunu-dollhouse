@@ -1,0 +1,555 @@
+{
+ "canvas": {
+  "w": 1024,
+  "h": 1536
+ },
+ "view": "front34",
+ "forward": 1,
+ "root": "torso",
+ "bones": [
+  {
+   "name": "upper_arm_r",
+   "parent": "torso",
+   "pivot": [
+    450,
+    423.3
+   ],
+   "slots": [
+    "m_front34_skin_upper_arm_r.png"
+   ]
+  },
+  {
+   "name": "lower_arm_r",
+   "parent": "upper_arm_r",
+   "pivot": [
+    373.3,
+    590
+   ],
+   "slots": [
+    "m_front34_skin_lower_arm_r.png"
+   ]
+  },
+  {
+   "name": "hand_r",
+   "parent": "lower_arm_r",
+   "pivot": [
+    326.7,
+    730
+   ],
+   "slots": [
+    "m_front34_skin_hand_r.png"
+   ],
+   "variants": {
+    "wrap": [
+     "m_front34_skin_hand_r_wrap.png"
+    ]
+   }
+  },
+  {
+   "name": "upper_leg_r",
+   "parent": "torso",
+   "pivot": [
+    443.3,
+    666.7
+   ],
+   "slots": [
+    "m_front34_skin_upper_leg_r.png",
+    "m_front34_underwear_upper_leg_r.png"
+   ]
+  },
+  {
+   "name": "lower_leg_r",
+   "parent": "upper_leg_r",
+   "pivot": [
+    486.7,
+    1020
+   ],
+   "slots": [
+    "m_front34_skin_lower_leg_r.png"
+   ]
+  },
+  {
+   "name": "foot_r",
+   "parent": "lower_leg_r",
+   "pivot": [
+    475.1,
+    1358.6
+   ],
+   "slots": [
+    "m_front34_skin_foot_r.png"
+   ]
+  },
+  {
+   "name": "torso",
+   "parent": null,
+   "pivot": [
+    490,
+    746.7
+   ],
+   "slots": [
+    "m_front34_skin_torso.png",
+    "m_front34_underwear_torso.png"
+   ]
+  },
+  {
+   "name": "head",
+   "parent": "torso",
+   "pivot": [
+    506.7,
+    338.1
+   ],
+   "slots": [
+    "m_front34_skin_head.png"
+   ],
+   "scale": 0.9
+  },
+  {
+   "name": "upper_leg_l",
+   "parent": "torso",
+   "pivot": [
+    553.3,
+    720
+   ],
+   "slots": [
+    "m_front34_skin_upper_leg_l.png",
+    "m_front34_underwear_upper_leg_l.png"
+   ]
+  },
+  {
+   "name": "lower_leg_l",
+   "parent": "upper_leg_l",
+   "pivot": [
+    580,
+    1006.7
+   ],
+   "slots": [
+    "m_front34_skin_lower_leg_l.png"
+   ]
+  },
+  {
+   "name": "foot_l",
+   "parent": "lower_leg_l",
+   "pivot": [
+    561.5,
+    1369.4
+   ],
+   "slots": [
+    "m_front34_skin_foot_l.png"
+   ]
+  },
+  {
+   "name": "upper_arm_l",
+   "parent": "torso",
+   "pivot": [
+    600,
+    433.3
+   ],
+   "slots": [
+    "m_front34_skin_upper_arm_l.png"
+   ]
+  },
+  {
+   "name": "lower_arm_l",
+   "parent": "upper_arm_l",
+   "pivot": [
+    630,
+    593.3
+   ],
+   "slots": [
+    "m_front34_skin_lower_arm_l.png"
+   ]
+  },
+  {
+   "name": "hand_l",
+   "parent": "lower_arm_l",
+   "pivot": [
+    700,
+    740
+   ],
+   "slots": [
+    "m_front34_skin_hand_l.png"
+   ],
+   "variants": {
+    "palm": [
+     "m_front34_skin_hand_l_palm.png"
+    ]
+   }
+  }
+ ],
+ "zOrder": [
+  "upper_arm_r",
+  "lower_arm_r",
+  "hand_r",
+  "upper_leg_r",
+  "lower_leg_r",
+  "foot_r",
+  "torso",
+  "head",
+  "upper_leg_l",
+  "lower_leg_l",
+  "foot_l",
+  "upper_arm_l",
+  "lower_arm_l",
+  "hand_l"
+ ],
+ "outfits": {
+  "tpl_shirt": {
+   "upper_arm_r": [
+    "m_front34_tpl_shirt_upper_arm_r.png"
+   ],
+   "torso": [
+    "m_front34_tpl_shirt_torso.png"
+   ],
+   "upper_arm_l": [
+    "m_front34_tpl_shirt_upper_arm_l.png"
+   ],
+   "torso:armhole": [
+    "m_front34_tpl_shirt_armhole.png"
+   ],
+   "torso:tuck": [
+    "m_front34_tpl_shirt_tuck.png"
+   ]
+  },
+  "kid_short_hair": {
+   "head": [
+    "m_front34_kid_short_hair.png"
+   ],
+   "head:behind": [
+    "m_front34_kid_short_hair_back.png"
+   ]
+  },
+  "kid_wavy_hair": {
+   "head": [
+    "m_front34_kid_wavy_hair.png"
+   ],
+   "head:behind": [
+    "m_front34_kid_wavy_hair_back.png"
+   ]
+  },
+  "kid_spiky_hair": {
+   "head": [
+    "m_front34_kid_spiky_hair.png"
+   ],
+   "head:behind": [
+    "m_front34_kid_spiky_hair_back.png"
+   ]
+  },
+  "kid_m_smile_iris": {
+   "head": [
+    "m_front34_kid_m_smile_iris.png"
+   ]
+  },
+  "kid_m_smile_face": {
+   "head": [
+    "m_front34_kid_m_smile_face.png"
+   ]
+  },
+  "kid_m_smile_mouth": {
+   "head": [
+    "m_front34_kid_m_smile_mouth.png"
+   ]
+  },
+  "kid_m_cool_iris": {
+   "head": [
+    "m_front34_kid_m_cool_iris.png"
+   ]
+  },
+  "kid_m_cool_face": {
+   "head": [
+    "m_front34_kid_m_cool_face.png"
+   ]
+  },
+  "kid_m_cool_mouth": {
+   "head": [
+    "m_front34_kid_m_cool_mouth.png"
+   ]
+  },
+  "kid_m_smile_lips": {
+   "head": [
+    "m_front34_kid_m_smile_lips.png"
+   ]
+  },
+  "kid_m_cool_lips": {
+   "head": [
+    "m_front34_kid_m_cool_lips.png"
+   ]
+  },
+  "kid_sidepart_hair": {
+   "head": [
+    "m_front34_kid_sidepart_hair.png"
+   ],
+   "head:behind": [
+    "m_front34_kid_sidepart_hair_back.png"
+   ]
+  },
+  "kid_buzz_hair": {
+   "head": [
+    "m_front34_kid_buzz_hair.png"
+   ],
+   "head:behind": [
+    "m_front34_kid_buzz_hair_back.png"
+   ]
+  },
+  "kid_curly_hair": {
+   "head": [
+    "m_front34_kid_curly_hair.png"
+   ],
+   "head:behind": [
+    "m_front34_kid_curly_hair_back.png"
+   ]
+  },
+  "kid_m_round_iris": {
+   "head": [
+    "m_front34_kid_m_round_iris.png"
+   ]
+  },
+  "kid_m_round_lips": {
+   "head": [
+    "m_front34_kid_m_round_lips.png"
+   ]
+  },
+  "kid_m_round_face": {
+   "head": [
+    "m_front34_kid_m_round_face.png"
+   ]
+  },
+  "kid_m_round_mouth": {
+   "head": [
+    "m_front34_kid_m_round_mouth.png"
+   ]
+  },
+  "kid_m_surprised_iris": {
+   "head": [
+    "m_front34_kid_m_surprised_iris.png"
+   ]
+  },
+  "kid_m_surprised_lips": {
+   "head": [
+    "m_front34_kid_m_surprised_lips.png"
+   ]
+  },
+  "kid_m_surprised_face": {
+   "head": [
+    "m_front34_kid_m_surprised_face.png"
+   ]
+  },
+  "kid_m_surprised_mouth": {
+   "head": [
+    "m_front34_kid_m_surprised_mouth.png"
+   ]
+  },
+  "shoes": {
+   "foot_r": [
+    "m_front34_shoes_foot_r.png"
+   ],
+   "foot_l": [
+    "m_front34_shoes_foot_l.png"
+   ]
+  },
+  "kid_m_tsunu_iris": {
+   "head": [
+    "m_front34_kid_m_tsunu_iris.png"
+   ]
+  },
+  "kid_m_tsunu_lips": {
+   "head": [
+    "m_front34_kid_m_tsunu_lips.png"
+   ]
+  },
+  "kid_m_tsunu_face": {
+   "head": [
+    "m_front34_kid_m_tsunu_face.png"
+   ]
+  },
+  "kid_m_tsunu_mouth": {
+   "head": [
+    "m_front34_kid_m_tsunu_mouth.png"
+   ]
+  },
+  "kid_m_smile_brows": {
+   "head": [
+    "m_front34_kid_m_smile_brows.png"
+   ]
+  },
+  "kid_m_cool_brows": {
+   "head": [
+    "m_front34_kid_m_cool_brows.png"
+   ]
+  },
+  "kid_m_round_brows": {
+   "head": [
+    "m_front34_kid_m_round_brows.png"
+   ]
+  },
+  "kid_m_surprised_brows": {
+   "head": [
+    "m_front34_kid_m_surprised_brows.png"
+   ]
+  },
+  "kid_m_tsunu_brows": {
+   "head": [
+    "m_front34_kid_m_tsunu_brows.png"
+   ]
+  },
+  "tpl_pants": {
+   "upper_leg_r": [
+    "m_front34_tpl_pants_upper_leg_r.png"
+   ],
+   "lower_leg_r": [
+    "m_front34_tpl_pants_lower_leg_r.png"
+   ],
+   "torso": [
+    "m_front34_tpl_pants_torso.png"
+   ],
+   "upper_leg_l": [
+    "m_front34_tpl_pants_upper_leg_l.png"
+   ],
+   "lower_leg_l": [
+    "m_front34_tpl_pants_lower_leg_l.png"
+   ]
+  },
+  "tpl_tee": {
+   "upper_arm_r": [
+    "m_front34_tpl_tee_upper_arm_r.png"
+   ],
+   "torso": [
+    "m_front34_tpl_tee_torso.png"
+   ],
+   "upper_arm_l": [
+    "m_front34_tpl_tee_upper_arm_l.png"
+   ],
+   "torso:armhole": [
+    "m_front34_tpl_tee_armhole.png"
+   ]
+  },
+  "tpl_tank": {
+   "torso": [
+    "m_front34_tpl_tank_torso.png"
+   ]
+  },
+  "tpl_shorts": {
+   "upper_leg_r": [
+    "m_front34_tpl_shorts_upper_leg_r.png"
+   ],
+   "torso": [
+    "m_front34_tpl_shorts_torso.png"
+   ],
+   "upper_leg_l": [
+    "m_front34_tpl_shorts_upper_leg_l.png"
+   ]
+  },
+  "tpl_coat": {
+   "upper_arm_r": [
+    "m_front34_tpl_coat_upper_arm_r.png"
+   ],
+   "lower_arm_r": [
+    "m_front34_tpl_coat_lower_arm_r.png"
+   ],
+   "torso": [
+    "m_front34_tpl_coat_torso.png"
+   ],
+   "upper_arm_l": [
+    "m_front34_tpl_coat_upper_arm_l.png"
+   ],
+   "lower_arm_l": [
+    "m_front34_tpl_coat_lower_arm_l.png"
+   ],
+   "torso:armhole": [
+    "m_front34_tpl_coat_armhole.png"
+   ]
+  },
+  "tpl_bowtie": {
+   "torso": [
+    "m_front34_tpl_bowtie_torso.png"
+   ]
+  },
+  "tpl_tie": {
+   "torso": [
+    "m_front34_tpl_tie_torso.png"
+   ]
+  },
+  "tpl_overalls": {
+   "upper_leg_r": [
+    "m_front34_tpl_overalls_upper_leg_r.png"
+   ],
+   "lower_leg_r": [
+    "m_front34_tpl_overalls_lower_leg_r.png"
+   ],
+   "torso": [
+    "m_front34_tpl_overalls_torso.png"
+   ],
+   "upper_leg_l": [
+    "m_front34_tpl_overalls_upper_leg_l.png"
+   ],
+   "lower_leg_l": [
+    "m_front34_tpl_overalls_lower_leg_l.png"
+   ]
+  },
+  "tpl_hoodie": {
+   "torso": [
+    "m_front34_tpl_hoodie_torso.png"
+   ],
+   "torso:armhole": [
+    "m_front34_tpl_hoodie_armhole.png"
+   ]
+  },
+  "tpl_wide_pants": {
+   "upper_leg_r": [
+    "m_front34_tpl_wide_pants_upper_leg_r.png"
+   ],
+   "lower_leg_r": [
+    "m_front34_tpl_wide_pants_lower_leg_r.png"
+   ],
+   "torso": [
+    "m_front34_tpl_wide_pants_torso.png"
+   ],
+   "upper_leg_l": [
+    "m_front34_tpl_wide_pants_upper_leg_l.png"
+   ],
+   "lower_leg_l": [
+    "m_front34_tpl_wide_pants_lower_leg_l.png"
+   ]
+  },
+  "tpl_hood": {
+   "torso": [
+    "m_front34_tpl_hood_torso.png"
+   ]
+  },
+  "kid_tsunu_hair": {
+   "head": [
+    "m_front34_kid_tsunu_hair.png"
+   ],
+   "head:behind": [
+    "m_front34_kid_tsunu_hair_back.png"
+   ]
+  },
+  "kid_tsunu_glasses": {
+   "head": [
+    "m_front34_kid_tsunu_glasses.png"
+   ]
+  }
+ },
+ "scale": 1.05,
+ "skinGray": true,
+ "skinBase": 0.6667,
+ "outfitAfter": {
+  "tpl_tee": {
+   "torso": "foot_l"
+  },
+  "tpl_tank": {
+   "torso": "foot_l"
+  },
+  "tpl_coat": {
+   "torso": "upper_leg_l"
+  },
+  "tpl_bowtie": {
+   "torso": "upper_arm_l"
+  },
+  "tpl_tie": {
+   "torso": "upper_arm_l"
+  },
+  "tpl_hoodie": {
+   "torso": "foot_l"
+  }
+ }
+}

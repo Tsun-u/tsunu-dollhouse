@@ -1,0 +1,35 @@
+{
+ "black": {
+  "label": "小黑",
+  "color": "#2b2b2f",
+  "images": {
+   "stand": "assets/pets/dog_black_stand.png",
+   "lie": "assets/pets/dog_black_lie.png"
+  }
+ },
+ "yellow": {
+  "label": "樂樂",
+  "color": "#d9a95a",
+  "images": {
+   "stand": "assets/pets/dog_yellow_stand.png",
+   "lie": "assets/pets/dog_yellow_lie.png"
+  },
+  "touches": {
+   "belly": {
+    "label": "摸肚子",
+    "note": "摸樂樂的肚子，樂樂翻過來露出肚皮撒嬌",
+    "play": "roll"
+   },
+   "brush": {
+    "label": "梳毛",
+    "note": "幫樂樂梳毛，樂樂舒服得瞇起眼睛",
+    "play": "cheer"
+   },
+   "come": {
+    "label": "叫她過來",
+    "note": "叫樂樂過來，樂樂跑來趴在腳邊",
+    "play": "come"
+   }
+  }
+ }
+}

@@ -1,0 +1,511 @@
+{
+ "canvas": {
+  "w": 1024,
+  "h": 1536
+ },
+ "view": "front",
+ "root": "torso",
+ "bones": [
+  {
+   "name": "upper_arm_l",
+   "parent": "torso",
+   "pivot": [
+    576.7,
+    442.0
+   ],
+   "slots": [
+    "front_skin_upper_arm_l.png"
+   ]
+  },
+  {
+   "name": "upper_arm_r",
+   "parent": "torso",
+   "pivot": [
+    445.5,
+    442.2
+   ],
+   "slots": [
+    "front_skin_upper_arm_r.png"
+   ]
+  },
+  {
+   "name": "torso",
+   "parent": null,
+   "pivot": [
+    512.0,
+    712.3
+   ],
+   "slots": [
+    "front_skin_torso.png",
+    "front_underwear_torso.png"
+   ]
+  },
+  {
+   "name": "upper_leg_l",
+   "parent": "torso",
+   "pivot": [
+    583.3,
+    746.7
+   ],
+   "slots": [
+    "front_skin_upper_leg_l.png"
+   ]
+  },
+  {
+   "name": "upper_leg_r",
+   "parent": "torso",
+   "pivot": [
+    439.1,
+    746.7
+   ],
+   "slots": [
+    "front_skin_upper_leg_r.png"
+   ]
+  },
+  {
+   "name": "lower_leg_l",
+   "parent": "upper_leg_l",
+   "pivot": [
+    567.6,
+    1014.6
+   ],
+   "slots": [
+    "front_skin_lower_leg_l.png"
+   ]
+  },
+  {
+   "name": "lower_leg_r",
+   "parent": "upper_leg_r",
+   "pivot": [
+    455.1,
+    1014.2
+   ],
+   "slots": [
+    "front_skin_lower_leg_r.png"
+   ]
+  },
+  {
+   "name": "foot_l",
+   "parent": "lower_leg_l",
+   "pivot": [
+    567.5,
+    1363.4
+   ],
+   "slots": [
+    "front_skin_foot_l.png"
+   ]
+  },
+  {
+   "name": "foot_r",
+   "parent": "lower_leg_r",
+   "pivot": [
+    454.6,
+    1363.6
+   ],
+   "slots": [
+    "front_skin_foot_r.png"
+   ]
+  },
+  {
+   "name": "lower_arm_l",
+   "parent": "upper_arm_l",
+   "pivot": [
+    663.8,
+    615.3
+   ],
+   "slots": [
+    "front_skin_lower_arm_l.png"
+   ]
+  },
+  {
+   "name": "lower_arm_r",
+   "parent": "upper_arm_r",
+   "pivot": [
+    358.5,
+    615.2
+   ],
+   "slots": [
+    "front_skin_lower_arm_r.png"
+   ]
+  },
+  {
+   "name": "hand_l",
+   "parent": "lower_arm_l",
+   "pivot": [
+    735.2,
+    778.1
+   ],
+   "slots": [
+    "front_skin_hand_l.png"
+   ],
+   "variants": {
+    "palm": [
+     "front_skin_hand_l_palm.png"
+    ]
+   }
+  },
+  {
+   "name": "hand_r",
+   "parent": "lower_arm_r",
+   "pivot": [
+    287.0,
+    778.2
+   ],
+   "slots": [
+    "front_skin_hand_r.png"
+   ]
+  },
+  {
+   "name": "head",
+   "parent": "torso",
+   "pivot": [
+    511.0,
+    357.5
+   ],
+   "slots": [
+    "front_skin_head.png"
+   ],
+   "scale": 0.85
+  }
+ ],
+ "zOrder": [
+  "upper_arm_l",
+  "upper_arm_r",
+  "torso",
+  "upper_leg_l",
+  "upper_leg_r",
+  "lower_leg_l",
+  "lower_leg_r",
+  "foot_l",
+  "foot_r",
+  "lower_arm_l",
+  "lower_arm_r",
+  "hand_l",
+  "hand_r",
+  "head"
+ ],
+ "forward": 1,
+ "outfits": {
+  "tpl_tee": {
+   "upper_arm_l": [
+    "front_tpl_tee_upper_arm_l.png"
+   ],
+   "upper_arm_r": [
+    "front_tpl_tee_upper_arm_r.png"
+   ],
+   "torso": [
+    "front_tpl_tee_torso.png"
+   ]
+  },
+  "tpl_dress": {
+   "torso": [
+    "front_tpl_dress_torso.png"
+   ],
+   "hem": [
+    "front_tpl_dress_hem.png"
+   ]
+  },
+  "tpl_pinafore": {
+   "torso": [
+    "front_tpl_pinafore_torso.png"
+   ],
+   "hem": [
+    "front_tpl_pinafore_hem.png"
+   ]
+  },
+  "tpl_coat": {
+   "upper_arm_l": [
+    "front_tpl_coat_upper_arm_l.png"
+   ],
+   "upper_arm_r": [
+    "front_tpl_coat_upper_arm_r.png"
+   ],
+   "torso": [
+    "front_tpl_coat_torso.png"
+   ],
+   "lower_arm_l": [
+    "front_tpl_coat_lower_arm_l.png"
+   ],
+   "lower_arm_r": [
+    "front_tpl_coat_lower_arm_r.png"
+   ]
+  },
+  "kid_ponytail_hair": {
+   "head": [
+    "front_kid_ponytail_hair.png"
+   ],
+   "head:behind": [
+    "front_kid_ponytail_hair_back.png"
+   ]
+  },
+  "kid_long_hair": {
+   "head": [
+    "front_kid_long_hair.png"
+   ],
+   "head:behind": [
+    "front_kid_long_hair_back.png"
+   ]
+  },
+  "kid_f_smile_iris": {
+   "head": [
+    "front_kid_f_smile_iris.png"
+   ]
+  },
+  "kid_f_smile_face": {
+   "head": [
+    "front_kid_f_smile_face.png"
+   ]
+  },
+  "kid_f_smile_mouth": {
+   "head": [
+    "front_kid_f_smile_mouth.png"
+   ]
+  },
+  "kid_f_round_iris": {
+   "head": [
+    "front_kid_f_round_iris.png"
+   ]
+  },
+  "kid_f_round_face": {
+   "head": [
+    "front_kid_f_round_face.png"
+   ]
+  },
+  "kid_f_round_mouth": {
+   "head": [
+    "front_kid_f_round_mouth.png"
+   ]
+  },
+  "kid_f_smile_lips": {
+   "head": [
+    "front_kid_f_smile_lips.png"
+   ]
+  },
+  "kid_f_round_lips": {
+   "head": [
+    "front_kid_f_round_lips.png"
+   ]
+  },
+  "kid_twintails_hair": {
+   "head": [
+    "front_kid_twintails_hair.png"
+   ],
+   "head:behind": [
+    "front_kid_twintails_hair_back.png"
+   ]
+  },
+  "kid_bun_hair": {
+   "head": [
+    "front_kid_bun_hair.png"
+   ],
+   "head:behind": [
+    "front_kid_bun_hair_back.png"
+   ]
+  },
+  "kid_pixie_hair": {
+   "head": [
+    "front_kid_pixie_hair.png"
+   ],
+   "head:behind": [
+    "front_kid_pixie_hair_back.png"
+   ]
+  },
+  "kid_f_droopy_iris": {
+   "head": [
+    "front_kid_f_droopy_iris.png"
+   ]
+  },
+  "kid_f_droopy_lips": {
+   "head": [
+    "front_kid_f_droopy_lips.png"
+   ]
+  },
+  "kid_f_droopy_face": {
+   "head": [
+    "front_kid_f_droopy_face.png"
+   ]
+  },
+  "kid_f_droopy_mouth": {
+   "head": [
+    "front_kid_f_droopy_mouth.png"
+   ]
+  },
+  "kid_f_grin_iris": {
+   "head": [
+    "front_kid_f_grin_iris.png"
+   ]
+  },
+  "kid_f_grin_lips": {
+   "head": [
+    "front_kid_f_grin_lips.png"
+   ]
+  },
+  "kid_f_grin_face": {
+   "head": [
+    "front_kid_f_grin_face.png"
+   ]
+  },
+  "kid_f_grin_mouth": {
+   "head": [
+    "front_kid_f_grin_mouth.png"
+   ]
+  },
+  "shoes": {
+   "foot_l": [
+    "front_shoes_foot_l.png"
+   ],
+   "foot_r": [
+    "front_shoes_foot_r.png"
+   ]
+  },
+  "kid_f_atone_iris": {
+   "head": [
+    "front_kid_f_atone_iris.png"
+   ]
+  },
+  "kid_f_atone_lips": {
+   "head": [
+    "front_kid_f_atone_lips.png"
+   ]
+  },
+  "kid_f_atone_face": {
+   "head": [
+    "front_kid_f_atone_face.png"
+   ]
+  },
+  "kid_f_atone_mouth": {
+   "head": [
+    "front_kid_f_atone_mouth.png"
+   ]
+  },
+  "kid_f_smile_brows": {
+   "head": [
+    "front_kid_f_smile_brows.png"
+   ]
+  },
+  "kid_f_round_brows": {
+   "head": [
+    "front_kid_f_round_brows.png"
+   ]
+  },
+  "kid_f_droopy_brows": {
+   "head": [
+    "front_kid_f_droopy_brows.png"
+   ]
+  },
+  "kid_f_grin_brows": {
+   "head": [
+    "front_kid_f_grin_brows.png"
+   ]
+  },
+  "kid_f_atone_brows": {
+   "head": [
+    "front_kid_f_atone_brows.png"
+   ]
+  },
+  "tpl_shirt": {
+   "upper_arm_l": [
+    "front_tpl_shirt_upper_arm_l.png"
+   ],
+   "upper_arm_r": [
+    "front_tpl_shirt_upper_arm_r.png"
+   ],
+   "torso": [
+    "front_tpl_shirt_torso.png"
+   ]
+  },
+  "tpl_bowtie": {
+   "torso": [
+    "front_tpl_bowtie_torso.png"
+   ]
+  },
+  "tpl_tank": {
+   "torso": [
+    "front_tpl_tank_torso.png"
+   ]
+  },
+  "tpl_shorts": {
+   "torso": [
+    "front_tpl_shorts_torso.png"
+   ],
+   "upper_leg_l": [
+    "front_tpl_shorts_upper_leg_l.png"
+   ],
+   "upper_leg_r": [
+    "front_tpl_shorts_upper_leg_r.png"
+   ]
+  },
+  "tpl_skirt": {
+   "torso": [
+    "front_tpl_skirt_torso.png"
+   ],
+   "hem": [
+    "front_tpl_skirt_hem.png"
+   ]
+  },
+  "kid_twinbuns_hair": {
+   "head": [
+    "front_kid_twinbuns_hair.png"
+   ],
+   "head:behind": [
+    "front_kid_twinbuns_hair_back.png"
+   ]
+  },
+  "kid_braids_hair": {
+   "head": [
+    "front_kid_braids_hair.png"
+   ],
+   "head:behind": [
+    "front_kid_braids_hair_back.png"
+   ]
+  },
+  "kid_straightbob_hair": {
+   "head": [
+    "front_kid_straightbob_hair.png"
+   ],
+   "head:behind": [
+    "front_kid_straightbob_hair_back.png"
+   ]
+  },
+  "kid_atone_hair": {
+   "head": [
+    "front_kid_atone_hair.png"
+   ],
+   "head:behind": [
+    "front_kid_atone_hair_back.png"
+   ]
+  },
+  "kid_waves_hair": {
+   "head": [
+    "front_kid_waves_hair.png"
+   ],
+   "head:behind": [
+    "front_kid_waves_hair_back.png"
+   ]
+  },
+  "kid_atone_glasses": {
+   "head": [
+    "front_kid_atone_glasses.png"
+   ]
+  }
+ },
+ "outfitAfter": {
+  "tpl_pinafore": {
+   "torso": "upper_leg_r"
+  },
+  "tpl_bowtie": {
+   "torso": "hand_r"
+  },
+  "tpl_dress": {
+   "torso": "upper_leg_r"
+  },
+  "tpl_skirt": {
+   "torso": "upper_leg_r"
+  },
+  "tpl_coat": {
+   "torso": "foot_r"
+  }
+ },
+ "skinGray": true,
+ "skinBase": 0.7633
+}
