@@ -73,13 +73,14 @@ startCafeClock(game, apply);
 
 /** 分頁：切到咖啡廳時從娃娃裡隨機抽一位顧店。 */
 for (const tabButton of $("tabs").children) {
-  tabButton.onclick = () => {
+  const show = () => {
     for (const b of $("tabs").children) b.classList.toggle("on", b === tabButton);
     for (const tab of document.querySelectorAll(".tab")) tab.classList.toggle("on", tab.id === tabButton.dataset.tab);
     if (tabButton.dataset.tab === "cafe") pickShopkeeper();
     fitScenes();
     if (tabButton.dataset.tab === "home") house.room.draw();
   };
+  tabButton.onclick = () => ($("closet").classList.contains("on") && tabButton.dataset.tab !== "closet" ? leaveCloset(show) : show());
 }
 
 function showTab(id) {
@@ -158,41 +159,92 @@ function renderCafe() {
 // ───────── 衣櫃：幫娃娃換衣服（衣服從遊戲存檔的衣櫃挑，穿在娃娃存檔） ─────────
 
 let closetWho = null;
+/** 衣櫃的試穿草稿：點衣服、換色都只改這份（{ id, worn, colors }），按存檔才寫進娃娃；null 是沒在試穿。 */
+let closetDraft = null;
+
+/** 衣櫃現在畫的樣子：在試穿這個娃娃就是草稿，不然照娃娃身上的。 */
+function closetLook(doll) {
+  return closetDraft?.id === doll.id ? closetDraft : { id: doll.id, worn: { ...doll.worn }, colors: { ...(doll.colors ?? {}) } };
+}
+
+/** 兩份「格子 → 衣服」或「衣服 → 顏色」一樣。 */
+const sameEntries = (a, b) => [...new Set([...Object.keys(a), ...Object.keys(b)])].every((key) => a[key] === b[key]);
+
+/** 草稿跟娃娃身上的不一樣：有東西要存。 */
+function closetChanged() {
+  const doll = closetDraft && dollsSave.dolls.find((d) => d.id === closetDraft.id);
+  return !!doll && !(sameEntries(doll.worn, closetDraft.worn) && sameEntries(doll.colors ?? {}, closetDraft.colors));
+}
+
+function editCloset(doll, change) {
+  const current = closetLook(doll);
+  closetDraft = { ...current, ...change(current) };
+  renderCloset();
+}
+
+function saveCloset() {
+  if (closetChanged()) setDolls({ ...dollsSave, dolls: updateDoll(dollsSave.dolls, closetDraft.id, { worn: closetDraft.worn, colors: closetDraft.colors }) });
+  closetDraft = null;
+  renderCloset();
+}
+
+function discardCloset() {
+  closetDraft = null;
+  renderCloset();
+}
+
+/** 要離開衣櫃（切分頁、換娃娃）時：草稿沒存就先問存檔、放棄、繼續試穿，選了存檔或放棄才接著 proceed。 */
+function leaveCloset(proceed) {
+  if (!closetChanged()) { closetDraft = null; proceed(); return; }
+  const dialog = $("closetLeave");
+  dialog.onclick = (event) => {
+    const choice = event.target.dataset?.choice;
+    if (!choice) return;
+    dialog.close();
+    if (choice === "stay") return;
+    if (choice === "save") saveCloset(); else discardCloset();
+    proceed();
+  };
+  dialog.showModal();
+}
+$("closetSaveBtn").onclick = saveCloset;
+$("closetDiscardBtn").onclick = discardCloset;
 
 function renderCloset() {
   const dolls = dollsSave.dolls;
   if (!dolls.some((doll) => doll.id === closetWho)) closetWho = dollsSave.selected ?? dolls[0]?.id ?? null;
   $("closetWho").replaceChildren(...dolls.map((doll) => {
     const chip = Object.assign(document.createElement("button"), { className: "item" + (doll.id === closetWho ? " on" : ""), textContent: doll.name });
-    chip.onclick = () => { closetWho = doll.id; renderCloset(); };
+    chip.onclick = () => leaveCloset(() => { closetWho = doll.id; renderCloset(); });
     return chip;
   }));
   const doll = dolls.find((d) => d.id === closetWho);
+  $("closetSave").hidden = !closetChanged();
   if (!doll) return;
-  const change = (changes) => setDolls({ ...dollsSave, dolls: updateDoll(dollsSave.dolls, doll.id, changes) });
+  const { worn, colors } = closetLook(doll);
   const starter = Object.values(BODIES[doll.body].starter);   // 基本款每個娃娃都有
   const wearable = (item) => content.clothes[item] && (!content.clothes[item].wearers || content.clothes[item].wearers.includes(BODIES[doll.body].sprites));   // 男生、女生素體各有各的衣服
   const items = [...new Set([...starter, ...Object.keys(game.state.wardrobe)])].filter(wearable);
-  const colorOf = (item) => doll.colors?.[item] ?? content.clothes[item].color;
-  // 照格子由內到外分組，每格一行標題；點了穿上，已經穿著的再點一次是脫掉那一格；穿著的那件下面一排色票換顏色
+  const colorOf = (item) => colors[item] ?? content.clothes[item].color;
+  // 照格子由內到外分組，每格一行標題；點了試穿，已經穿著的再點一次是脫掉那一格；穿著的那件下面一排色票換顏色；按存檔才寫進娃娃
   $("wardrobe").replaceChildren(...Object.keys(SLOT_LABEL).flatMap((slot) => {
     const inSlot = items.filter((item) => CATEGORY_SLOT[content.clothes[item].category] === slot);
     if (!inSlot.length) return [];
     const title = Object.assign(document.createElement("div"), { className: "wardrobe-slot", textContent: SLOT_LABEL[slot] });
     const chips = inSlot.map((item) => {
-      const on = doll.worn[slot] === item;
+      const on = worn[slot] === item;
       const chip = Object.assign(document.createElement("button"), { className: "item" + (on ? " on" : "") });
       chip.innerHTML = `<span class="swatch" style="background:${colorOf(item)}"></span>${content.clothes[item].label}`;
-      chip.onclick = () => { const { [slot]: _, ...rest } = doll.worn; change({ worn: on ? rest : { ...doll.worn, [slot]: item } }); };
+      chip.onclick = () => editCloset(doll, (current) => { const { [slot]: _, ...rest } = current.worn; return { worn: on ? rest : { ...current.worn, [slot]: item } }; });
       return chip;
     });
-    const wearing = doll.worn[slot];
+    const wearing = worn[slot];
     const spec = content.clothes[wearing];
     const recolorable = spec && (spec.dye || !spec.sprites?.[BODIES[doll.body].sprites]);   // 彩色原稿（牛仔短褲）不給換色；灰稿與用模板畫的才行
     if (!inSlot.includes(wearing) || !recolorable) return [title, ...chips];
     const palette = Object.assign(document.createElement("div"), { className: "swatches wardrobe-colors" });
     palette.append(...CLOTHES_COLORS.map((color) => {
-      const button = Object.assign(document.createElement("button"), { title: color, onclick: () => change({ colors: { ...doll.colors, [wearing]: color } }) });
+      const button = Object.assign(document.createElement("button"), { title: color, onclick: () => editCloset(doll, (current) => ({ colors: { ...current.colors, [wearing]: color } })) });
       button.style.background = color;
       if (colorOf(wearing) === color) button.classList.add("on");
       return button;
@@ -215,7 +267,8 @@ function drawCloset(time) {
   const body = BODIES[doll.body];
   const skeleton = skeletons[body.views.front];
   const who = { name: body.sprites, skeletons: { front: skeleton, front34: skeletons[body.views.front34], back34: skeletons[body.views.back34] }, headParts: headParts(doll) };
-  const { outfits, bodyTint } = dressUp(who, doll.worn, content.clothes, doll.colors);
+  const look = closetLook(doll);   // 試穿中就畫草稿
+  const { outfits, bodyTint } = dressUp(who, look.worn, content.clothes, look.colors);
   const scale = (rect.height * 0.92) / skeleton.data.canvas.h;
   skeleton.draw(ctx, samplePose(animations.idle, time, "front"), { x: rect.width / 2 - (skeleton.data.canvas.w * scale) / 2, y: rect.height * 0.04, scale, outfits, skin: doll.skin, bodyTint });
 }

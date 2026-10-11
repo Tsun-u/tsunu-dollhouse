@@ -56,8 +56,15 @@
     <div class="panel-head"><span>幫誰換衣服</span><span id="closetWho" class="chips"></span></div>
     <div id="closetBody">
       <canvas id="closetCanvas"></canvas>
-      <div id="wardrobe" class="chips"></div>
+      <div class="closet-list">
+        <div id="closetSave" class="closet-save" hidden><span>試穿中，存檔才會換上</span><button id="closetSaveBtn">存檔</button><button id="closetDiscardBtn" class="quiet">放棄</button></div>
+        <div id="wardrobe" class="chips"></div>
+      </div>
     </div>
+    <dialog id="closetLeave" class="closet-leave">
+      <p>這套還沒存檔，要換上嗎？</p>
+      <div class="chips"><button data-choice="save">存檔</button><button data-choice="discard" class="quiet">放棄這套</button><button data-choice="stay" class="quiet">繼續試穿</button></div>
+    </dialog>
   </section>
 
   <section id="puzzle" class="tab">

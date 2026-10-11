@@ -219,6 +219,14 @@ button:disabled { background: var(--line); color: var(--muted); cursor: default;
 .swatches button.on { border-color: var(--ink); box-shadow: 0 0 0 2px var(--panel) inset; }
 .swatches button:disabled { opacity: 0.3; }
 .wardrobe-colors { flex-basis: 100%; }
+/* 衣櫃試穿：草稿跟身上穿的不一樣時出現存檔／放棄 */
+.closet-save { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; padding: 8px 10px; border-radius: 10px; background: var(--panel); border: 1px dashed var(--accent); font-size: 14px; color: var(--muted); }
+.closet-save[hidden] { display: none; }
+.closet-save span { flex: 1 1 auto; }
+.closet-save button.quiet, .closet-leave button.quiet { background: var(--line); color: var(--ink); }
+.closet-leave { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); padding: 16px 18px; }
+.closet-leave::backdrop { background: rgba(59, 47, 42, 0.35); }
+.closet-leave p { margin: 0 0 12px; }
 #dollName { font: inherit; font-size: 16px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; width: 100%; max-width: 240px; }
 #saveBox { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 @media (max-width: 560px) { #creator { grid-template-columns: 1fr; } #creatorCanvas { max-width: 260px; margin: 0 auto; } }

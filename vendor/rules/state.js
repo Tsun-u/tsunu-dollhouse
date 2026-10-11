@@ -236,6 +236,49 @@ function reduce(state, action, context) {
             const slot = CATEGORY_SLOT[spec.category]; // 每一格各穿各的：穿外套不換掉上衣、穿背心裙不換掉短褲
             return { state: dress({ ...worn, [slot]: action.item }), note: `${helping}${worn[slot] ? "換上" : "穿上"}${spec.label}` };
         }
+        case "dress": {
+            if (context.actor === "game")
+                throw new Error("小屋自己不穿衣服。");
+            const who = action.who ?? context.actor;
+            const before = state.worn[who];
+            const owned = (item) => {
+                const spec = clothes[item];
+                if (!spec)
+                    throw new Error(`沒有「${item}」這件衣服。`);
+                if ((state.wardrobe[item] ?? 0) < 1)
+                    throw new Error(`衣櫃裡沒有${spec.label}。`);
+                return spec;
+            };
+            const added = [];
+            for (const [slot, item] of Object.entries(action.worn)) { // 新穿上的才檢查：原本就穿著的當初穿的時候檢查過了
+                if (before[slot] === item)
+                    continue;
+                const spec = owned(item);
+                if (spec.wearers && !spec.wearers.includes(who))
+                    throw new Error(`${spec.label}只有${spec.wearers.map((name) => ACTOR_NAME[name]).join("、")}能穿。`);
+                if (CATEGORY_SLOT[spec.category] !== slot)
+                    throw new Error(`${spec.label}要穿在${SLOT_LABEL[CATEGORY_SLOT[spec.category]]}。`);
+                added.push(spec.label);
+            }
+            const removed = Object.entries(before).filter(([slot]) => !action.worn[slot]).map(([, item]) => clothes[item]?.label ?? item);
+            const colors = { ...state.clothesColors };
+            const recolored = [];
+            for (const [item, color] of Object.entries(action.colors ?? {})) {
+                const spec = owned(item);
+                const next = color === null ? undefined : hexColor(color);
+                if (colors[item] === next)
+                    continue;
+                if (next === undefined)
+                    delete colors[item];
+                else
+                    colors[item] = next;
+                recolored.push(spec.label);
+            }
+            if (!added.length && !removed.length && !recolored.length)
+                throw new Error("沒有要換的。");
+            const parts = [...(added.length ? [`換上了${added.join("、")}`] : []), ...(removed.length ? [`脫下了${removed.join("、")}`] : []), ...(recolored.length ? [`把${recolored.join("、")}換了顏色`] : [])];
+            return { state: { ...state, worn: { ...state.worn, [who]: { ...action.worn } }, clothesColors: colors }, note: `${who !== context.actor ? `幫${ACTOR_NAME[who]}` : ""}${parts.join("，")}` };
+        }
         case "give": {
             if (context.actor === "game")
                 throw new Error("小屋自己不遞東西。");
