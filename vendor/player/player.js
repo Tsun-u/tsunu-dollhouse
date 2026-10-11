@@ -37,9 +37,12 @@ const DYE_LINE_LUM = 0.25;   // 比這暗的像素算輪廓線，不算進布料
 const DYE_MAX_GAIN = 1.25;  // 亮部最多比目標色亮這麼多（再亮就被截成目標色的 1.25 倍）
 const GARMENT_AFTER = { lower_leg_l: "foot_l", lower_leg_r: "foot_r", lower_arm_l: "hand_l", lower_arm_r: "hand_r" };
 // 灰稿素體（骨架檔 skinGray）的漸層對應：像素亮度 ÷ 全身平均亮度（skinBase）＝ 相對亮度，照下面幾個點內插出顏色。
-// 每個點是主膚色的倍率（暗部偏暖：紅掉得少、藍掉得多）；null 是亮部，往白色混 SKIN_LIGHT_MIX。
+// 每個點是主膚色的倍率（暗部偏暖：紅掉得少、藍掉得多），暖色偏移與陰影深度照膚色深淺收斂（見 shadowRatio）；
+// null 是亮部：主膚色提亮 SKIN_LIGHT_LIFT 倍再混一點白（混太多白，深膚色的亮部會變成灰白斑）。
 const SKIN_STOPS = [[0, [0.45, 0.28, 0.22]], [0.55, [0.76, 0.55, 0.49]], [0.8, [0.94, 0.8, 0.74]], [1, [1, 1, 1]], [1.2, null]];
-const SKIN_LIGHT_MIX = 0.65;
+const SKIN_LIGHT_LIFT = 1.15;
+const SKIN_LIGHT_MIX = 0.2;
+const SKIN_DARKEST_SHADOW = 0.65;   // 最深的膚色，陰影只壓到最淺膚色陰影深度的這個比例
 const SKIN_ART_TINT = [0.933, 0.902, 0.867];   // 舊素體原圖的平均色：主膚色＝玩家選的膚色×它，新舊素體選同一個膚色一樣深
 const DEFAULT_SKIN = "#ffe8d1";
 const OUTLINE_COLOR = "#4c291a";   // 灰稿素體的外框色（手繪素體原本輪廓線的顏色）
@@ -49,6 +52,17 @@ const LIMB_OF = Object.fromEntries([
   ...["l", "r"].flatMap((side) => [[`arm_${side}`, [`upper_arm_${side}`, `lower_arm_${side}`, `hand_${side}`]], [`leg_${side}`, [`upper_leg_${side}`, `lower_leg_${side}`, `foot_${side}`]]]),
 ].flatMap(([limb, bones]) => bones.map((bone) => [bone, limb])));   // 骨頭屬於哪條肢體：同一條肢體內的交界是關節，不補線
 const OUTLINE_DIRECTIONS =[[-1, 0], [1, 0], [0, -1], [0, 1], [-0.7, -0.7], [0.7, -0.7], [-0.7, 0.7], [0.7, 0.7]];
+
+/** 主膚色（RGB 0～255）：玩家選的膚色 × 舊素體原圖的平均色。 */
+const mainSkin = (skin) => [1, 3, 5].map((k, i) => parseInt(skin.slice(k, k + 2), 16) * SKIN_ART_TINT[i]);
+const luminance = ([r, g, b]) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+/** 陰影點的倍率照膚色深淺收斂：越深的膚色，暖色偏移越小（三個色版往平均靠）、陰影越淺（不往黑壓）。lightness：最淺的膚色＝ 1。 */
+function shadowRatio(ratio, lightness) {
+  const mean = ratio.reduce((sum, r) => sum + r) / ratio.length;
+  const depth = SKIN_DARKEST_SHADOW + (1 - SKIN_DARKEST_SHADOW) * lightness;
+  return ratio.map((r) => 1 - (1 - (mean + (r - mean) * lightness)) * depth);
+}
 
 export class Skeleton {
   constructor(data, images, offsets = {}) {
@@ -133,8 +147,12 @@ export class Skeleton {
     const key = `skin|${slot}|${skin}`;
     if (!this.tintCache) this.tintCache = new Map();
     if (this.tintCache.has(key)) return this.tintCache.get(key);
-    const main = [1, 3, 5].map((k, i) => parseInt(skin.slice(k, k + 2), 16) * SKIN_ART_TINT[i]);
-    const stops = SKIN_STOPS.map(([at, ratio]) => [at, ratio ? main.map((c, i) => c * ratio[i]) : main.map((c) => c + (255 - c) * SKIN_LIGHT_MIX)]);
+    const main = mainSkin(skin);
+    const lightness = Math.min(1, luminance(main) / luminance(mainSkin(DEFAULT_SKIN)));   // 膚色多淺：預設膚色（最淺）＝ 1
+    const stops = SKIN_STOPS.map(([at, ratio]) => [at, ratio ? shadowRatio(ratio, lightness).map((r, i) => main[i] * r) : main.map((c) => {
+      const lifted = Math.min(255, c * SKIN_LIGHT_LIFT);
+      return lifted + (255 - lifted) * SKIN_LIGHT_MIX;
+    })]);
     const source = this.images[slot];
     const canvas = document.createElement("canvas");
     canvas.width = source.naturalWidth; canvas.height = source.naturalHeight;

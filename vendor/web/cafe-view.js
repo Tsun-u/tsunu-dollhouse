@@ -1,13 +1,12 @@
 // 店內（咖啡廳、雜貨店、服飾店共用）：側面剖面。櫃台在左、門在右，阿童站櫃台後，客人從門口走進來排隊，
-// 頭上冒出想要的商品；點客人就出餐。客人的長相由外觀種子（customer.look）決定：男生或女生素體、髮型、五官、各種顏色。
+// 頭上冒出想要的商品；點客人就出餐。客人的長相由外觀種子（customer.look）決定：男生或女生素體、長相、穿著與顏色都隨機。
 
 const W = 900, H = 360, FLOOR_Y = 320, COUNTER = { x: 110, w: 170, h: 90 }, DOOR_X = 820;
 const QUEUE_X = [330, 420, 505];   // 排隊位置在櫃台與桌組之間
 const WALK_SPEED = 220;   // 畫布像素／秒
 const GUEST_FACING = { front34: 1, back34: -1 };   // 斜前面向左邊的櫃台、斜後面向右邊的門
-const CUSTOMER_TOPS = ["#9fd8c9", "#f2dc8c", "#c9b6e4", "#f4b3c2", "#a9c8ee", "#d9c3a5"];   // 上衣模板染的顏色
-const CUSTOMER_PANTS = ["#cfbda2", "#3d4a66", "#4a4a4f", "#a89a86", "#6b5442", "#5a6f95"];   // 染客人的長褲、短褲模板（卡其、深藍、炭灰、灰褐、咖啡、牛仔藍）
-const CUSTOMER_SHOES = ["#5a4636", "#2f3440", "#8a6a4a", "#e9e4da", "#7a3b3b", "#3f5a4a"];   // 染灰稿便鞋
+const EXTRA_LAYERS = { overskirt: 0.2, coat: 0.25, accessory: 0.2 };   // 客人加穿罩裙、外套、飾品的機率
+const ROLLS = Array.from({ length: 100 }, (_, i) => i / 100);   // 用種子抽機率
 const PATIENCE_MS = 150_000;
 // 店面圖（小葵畫的正側面剖面）：wall 滿版、counter 與 table（只有咖啡廳有桌組）疊在前面；圖沒到就畫色塊
 const ART = {   // 相對頁面的網址：小屋與兒童版都從自己的根目錄找
@@ -20,8 +19,9 @@ const BRUSH_R = 11;   // 裝飾點右上角小刷子的半徑
 
 export class CafeView {
   /** guests：客人可以用的素體 [{ body: "f"|"m", views }]，views 是三個視角一組 { front, front34, back34 }（進門斜前、離開斜後），
-   *  或只有 { front }（客人一律正面、靠左右翻轉表示方向）。looks：兩版共用的捏角模組（規則層的 looks.js），客人的長相照它抽。 */
-  constructor(canvas, { skeleton, guests, looks, animations, samplePose }, icons, act) {
+   *  或只有 { front }（客人一律正面、靠左右翻轉表示方向）。looks：兩版共用的捏角模組（規則層的 looks.js），客人的長相照它抽。
+   *  clothes：衣服目錄；dress：穿衣模組（dress.js 的 dressUp、dyeable、CATEGORY_SLOT），客人的穿著跟衣櫃同一套規則。 */
+  constructor(canvas, { skeleton, guests, looks, clothes, dress, animations, samplePose }, icons, act) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.skeleton = skeleton;
@@ -31,7 +31,9 @@ export class CafeView {
     this.act = act;
     this.owner = { skin: "#ffe8d1", outfits: ["atone_face", "atone_mouth", "atone_hair", "atone_glasses"], bodyTint: null };   // app.js 依存檔穿著更新
     this.looks = looks;
-    this.wardrobes = guests.map(({ body, views }) => guestWardrobe(body, views));
+    this.clothes = clothes;
+    this.dress = dress;
+    this.wardrobes = guests.map(({ body, views }) => guestWardrobe(body, looks.BODIES[body].sprites, views));
     this.customers = new Map();   // id → { data, x, target, leaving, look }
     this.state = null;
     this.ratio = 1;
@@ -83,14 +85,17 @@ export class CafeView {
     this.shop.customers.forEach((data, index) => {
       seen.add(data.id);
       const existing = this.customers.get(data.id);
-      if (existing) { existing.data = data; existing.target = QUEUE_X[index]; }
-      else this.customers.set(data.id, { data, x: DOOR_X + 60, target: QUEUE_X[index], leaving: false, look: this.dressGuest(data.look) });
+      if (existing) { existing.data = data; existing.target = QUEUE_X[index]; return; }
+      const customer = { data, x: DOOR_X + 60, target: QUEUE_X[index], leaving: false, look: this.dressGuest(data.look), ready: false };
+      Promise.all(Object.values(customer.look.views).map((skeleton) => skeleton.partsSettled())).then(() => { customer.ready = true; });   // 衣服、五官的圖載完才進門，不會先露出素體
+      this.customers.set(data.id, customer);
     });
     for (const [id, customer] of this.customers) if (!seen.has(id) && !customer.leaving) { customer.leaving = true; customer.target = DOOR_X + 80; }
   }
 
   step(dt) {
     for (const [id, customer] of this.customers) {
+      if (!customer.ready) continue;
       const dx = customer.target - customer.x;
       if (Math.abs(dx) <= WALK_SPEED * dt) { customer.x = customer.target; if (customer.leaving) this.customers.delete(id); }
       else customer.x += Math.sign(dx) * WALK_SPEED * dt;
@@ -105,7 +110,7 @@ export class CafeView {
       if (Math.hypot(x - bx, y - by) <= BRUSH_R + 4) { this.onDecor?.(spot); return; }
     }
     for (const customer of this.customers.values()) {
-      if (!customer.leaving && Math.abs(x - customer.x) < 40 && y > FLOOR_Y - 150 && y < FLOOR_Y) { this.act({ kind: "serve", customer: customer.data.id }); return; }
+      if (customer.ready && !customer.leaving && Math.abs(x - customer.x) < 40 && y > FLOOR_Y - 150 && y < FLOOR_Y) { this.act({ kind: "serve", customer: customer.data.id }); return; }
     }
   }
 
@@ -169,21 +174,36 @@ export class CafeView {
     }
   }
 
-  /** 用外觀種子挑素體、上衣顏色、長相（共用捏角模組的隨機長相：髮型、髮色、眼睛、瞳色、嘴巴、唇色、膚色）、鞋子與褲子顏色；
-   *  同一顆種子永遠是同一個樣子。 */
+  /** 用外觀種子挑素體、長相（共用捏角模組的隨機長相）、每一格穿什麼與顏色，交給衣櫃同一套 dressUp 疊好；同一顆種子永遠是同一個樣子。 */
   dressGuest(seed) {
     const pick = seededPicker(seed);
     const wardrobe = pick(this.wardrobes);
-    const topColor = pick(CUSTOMER_TOPS);
-    const top = wardrobe.top ? [wardrobe.top.dye ? { name: wardrobe.top.name, tint: topColor, tuck: !!wardrobe.top.tucked } : wardrobe.top.name] : [];
-    const bottom = (wardrobe.top?.with ?? []).map((entry) => (typeof entry === "string" ? entry : { ...entry }));
-    const outfits = wardrobe.top?.tucked ? [...top, ...bottom] : [...bottom, ...top];   // 下身先畫，上衣下擺蓋在褲頭上；紮進去的反過來
+    const { worn, colors } = this.randomWorn(pick, wardrobe);
     const looks = this.looks.randomLooks(pick, wardrobe.body, wardrobe.outfits);
-    outfits.push(...this.looks.headParts(looks));
-    if (wardrobe.shoes) outfits.unshift({ name: "shoes", tint: pick(CUSTOMER_SHOES) });   // 排在最前面先畫，褲管蓋在鞋口上
-    for (const entry of bottom) if (entry.dye) entry.tint = pick(CUSTOMER_PANTS);
+    const who = { name: wardrobe.sprites, skeletons: wardrobe.views, headParts: this.looks.headParts(looks) };
+    const { outfits, bodyTint } = this.dress.dressUp(who, worn, this.clothes, colors);
     for (const skeleton of Object.values(wardrobe.views)) skeleton.preloadOutfits(outfits);   // 進門斜前、離開斜後：每個視角的衣服先載好，轉身不閃素體
-    return { views: wardrobe.views, skin: looks.skin, outfits };
+    return { views: wardrobe.views, skin: looks.skin, outfits, bodyTint };
+  }
+
+  /** 客人每一格穿什麼：上衣必穿，不是洋裝就配下衣，罩裙、外套、飾品照機率加穿，鞋子一定穿；能換色的衣服從共用色票抽顏色。
+   *  只挑這個素體穿得了、每個視角都畫得出來的衣服。 */
+  randomWorn(pick, wardrobe) {
+    const worn = {}, colors = {};
+    const drawable = (spec) => [spec.sprites?.[wardrobe.sprites], `tpl_${spec.category}`].some((name) => name && Object.values(wardrobe.views).every((skeleton) => skeleton.data.outfits?.[name]));
+    const put = (slot) => {
+      const options = Object.entries(this.clothes).filter(([, spec]) => this.dress.CATEGORY_SLOT[spec.category] === slot && (!spec.wearers || spec.wearers.includes(wardrobe.sprites)) && drawable(spec));
+      const [id, spec] = pick(options) ?? [];
+      if (!id) return;
+      worn[slot] = id;
+      if (this.dress.dyeable(spec)) colors[id] = pick(this.looks.CLOTHES_COLORS);
+    };
+    put("top");
+    const dress = this.clothes[worn.top]?.category === "dress";
+    if (!dress) put("bottom");
+    for (const [slot, chance] of Object.entries(EXTRA_LAYERS)) if (pick(ROLLS) < chance && !(dress && slot === "overskirt")) put(slot);
+    put("shoes");
+    return { worn, colors };
   }
 
   /** 客人朝哪個視角：進門、排隊面向櫃台是斜前，買完走向門口是斜後；素體沒有那個視角就用正面、靠左右翻轉。 */
@@ -222,6 +242,7 @@ export class CafeView {
     if (this.state && !this.shop.open) { ctx.fillStyle = "rgba(60,40,30,0.55)"; ctx.fillRect(0, 0, W, H); ctx.fillStyle = "#fff"; ctx.font = "24px sans-serif"; ctx.fillText("打烊中", W / 2, H / 2); this.drawBrushes(); return; }
     // 客人
     for (const customer of this.customers.values()) {
+      if (!customer.ready) continue;
       const walking = customer.x !== customer.target;
       this.drawPerson(customer.x, time + (customer.data.look % 97), { ...customer.look, ...this.guestTurn(customer), anim: walking ? "walk" : "idle" });   // 錯開每個人的動畫相位
       if (!customer.leaving) this.drawBubble(customer, time);
@@ -254,26 +275,16 @@ export class CafeView {
   }
 }
 
-/** 客人的上衣：女生穿 T 恤模板染色、搭染色的短褲模板（跟衣櫃同一套）；
- *  男生穿襯衫模板染色、紮進染色的長褲模板（tucked：褲子畫在襯衫之後，蓋住紮進去的下襬）。每個視角都要有才用。 */
-function guestTop(views) {
-  const everyView = (name) => Object.values(views).every((skeleton) => skeleton.data.outfits?.[name]);
-  if (everyView("tpl_tee") && everyView("tpl_shorts")) return { name: "tpl_tee", dye: true, with: [{ name: "tpl_shorts", dye: true }] };
-  if (everyView("tpl_shirt") && everyView("tpl_pants")) return { name: "tpl_shirt", dye: true, tucked: true, with: [{ name: "tpl_pants", dye: true }] };
-  return null;
-}
-
-/** 一個素體能配給客人的衣著：鞋子、上衣，以及長相可以挑的套名（轉身不會缺零件）：
+/** 一個素體給客人用的資料：素體代號（衣服目錄的 wearers、sprites 用）、各視角骨架，以及長相可以挑的套名（轉身不會缺零件）：
  *  頭髮每個視角都要有；五官只要斜後以外的視角有（斜後看不到臉）。 */
-function guestWardrobe(body, views) {
+function guestWardrobe(body, sprites, views) {
   const inViews = (skeletons) => (name) => skeletons.every((skeleton) => skeleton.data.outfits?.[name]);
   const everyView = inViews(Object.values(views));
   const faceViews = inViews(Object.entries(views).filter(([view]) => view !== "back34").map(([, skeleton]) => skeleton));
   return {
     body,
+    sprites,
     views,
-    shoes: everyView("shoes"),   // 灰稿便鞋（scripts/make_shoes.py），每個視角都有才穿
-    top: guestTop(views),
     outfits: Object.fromEntries(Object.keys(views.front.data.outfits ?? {}).filter((name) => (name.endsWith("_hair") ? everyView(name) : faceViews(name))).map((name) => [name, true])),
   };
 }

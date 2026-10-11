@@ -4,7 +4,7 @@
 import { loadSkeleton, samplePose } from "../vendor/player/player.js";
 import { BODIES, CLOTHES_COLORS, headParts, randomLooks } from "../vendor/rules/looks.js";
 import { CafeView } from "../vendor/web/cafe-view.js";
-import { CATEGORY_SLOT, SLOT_LABEL, dressUp } from "../vendor/web/dress.js";
+import { CATEGORY_SLOT, SLOT_LABEL, dressUp, dyeable } from "../vendor/web/dress.js";
 import { IconSheet } from "../vendor/web/icons.js";
 import { PuzzleView } from "../vendor/web/puzzle-view.js";
 import { WorkshopView } from "../vendor/web/workshop-view.js";
@@ -67,7 +67,7 @@ const icons = new IconSheet(content.recipes, () => renderAll());
 const puzzle = new PuzzleView($("board"), $("puzzleInfo"), $("puzzleStart"), icons, apply, content.settings.stamina);
 const workshop = new WorkshopView({ materials: $("materials"), grid: $("grid"), products: $("products") }, content.recipes, icons, apply);
 const guests = Object.entries(BODIES).map(([body, spec]) => ({ body, views: { front: skeletons[spec.views.front], front34: skeletons[spec.views.front34], back34: skeletons[spec.views.back34] } }));
-const cafe = new CafeView($("cafeCanvas"), { skeleton: skeletons.front, guests, looks: { headParts, randomLooks }, animations, samplePose }, icons, apply);
+const cafe = new CafeView($("cafeCanvas"), { skeleton: skeletons.front, guests, looks: { BODIES, CLOTHES_COLORS, headParts, randomLooks }, clothes: content.clothes, dress: { dressUp, dyeable, CATEGORY_SLOT }, animations, samplePose }, icons, apply);
 $("cafeToggle").onclick = () => apply({ kind: "shop_open", open: !game.state.shops.cafe.open });
 startCafeClock(game, apply);
 
@@ -188,8 +188,8 @@ function renderCloset() {
     });
     const wearing = doll.worn[slot];
     const spec = content.clothes[wearing];
-    const dyeable = spec && (spec.dye || !spec.sprites?.[BODIES[doll.body].sprites]);   // 彩色原稿（牛仔短褲）不給換色；灰稿與用模板畫的才行
-    if (!inSlot.includes(wearing) || !dyeable) return [title, ...chips];
+    const recolorable = spec && (spec.dye || !spec.sprites?.[BODIES[doll.body].sprites]);   // 彩色原稿（牛仔短褲）不給換色；灰稿與用模板畫的才行
+    if (!inSlot.includes(wearing) || !recolorable) return [title, ...chips];
     const palette = Object.assign(document.createElement("div"), { className: "swatches wardrobe-colors" });
     palette.append(...CLOTHES_COLORS.map((color) => {
       const button = Object.assign(document.createElement("button"), { title: color, onclick: () => change({ colors: { ...doll.colors, [wearing]: color } }) });
