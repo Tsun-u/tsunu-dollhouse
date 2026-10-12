@@ -576,6 +576,22 @@
    "lower_leg_r": [
     "front_tpl_pants_lower_leg_r.png"
    ]
+  },
+  "kid_sideponytail_hair": {
+   "head": [
+    "front_kid_sideponytail_hair.png"
+   ],
+   "head:behind": [
+    "front_kid_sideponytail_hair_back.png"
+   ]
+  },
+  "kid_sideponytailhl_hair": {
+   "head": [
+    "front_kid_sideponytailhl_hair.png"
+   ],
+   "head:behind": [
+    "front_kid_sideponytailhl_hair_back.png"
+   ]
   }
  },
  "outfitAfter": {

@@ -20,6 +20,7 @@ export const HAIRS = [
     { id: "kid_fluffylong", body: "f", label: "蓬鬆長髮", outfit: "kid_fluffylong_hair" },
     { id: "kid_bunwaves", body: "f", label: "雙包頭長捲髮", outfit: "kid_bunwaves_hair" },
     { id: "kid_lowponytail", body: "f", label: "低馬尾", outfit: "kid_lowponytail_hair" },
+    { id: "kid_sideponytail", body: "f", label: "側邊捲馬尾", outfit: "kid_sideponytail_hair", highlight: "kid_sideponytailhl_hair" },
     { id: "curly_short", body: "f", label: "捲捲短髮", outfit: "kid_atone_hair" },
     { id: "kid_short", body: "m", label: "清爽短髮", outfit: "kid_short_hair", highlight: "kid_shorthl_hair" },
     { id: "kid_wavy", body: "m", label: "微捲中長髮", outfit: "kid_wavy_hair" },

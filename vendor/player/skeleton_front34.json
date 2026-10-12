@@ -584,6 +584,22 @@
    "lower_leg_l": [
     "front34_tpl_pants_lower_leg_l.png"
    ]
+  },
+  "kid_sideponytail_hair": {
+   "head": [
+    "front34_kid_sideponytail_hair.png"
+   ],
+   "head:behind": [
+    "front34_kid_sideponytail_hair_back.png"
+   ]
+  },
+  "kid_sideponytailhl_hair": {
+   "head": [
+    "front34_kid_sideponytailhl_hair.png"
+   ],
+   "head:behind": [
+    "front34_kid_sideponytailhl_hair_back.png"
+   ]
   }
  },
  "skinGray": true,

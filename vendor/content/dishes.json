@@ -27,5 +27,14 @@
   },
   "stamina": 2,
   "image": "assets/items/dishes/omurice.png"
+ },
+ "udon": {
+  "label": "月見烏龍麵",
+  "ingredients": {
+   "wheat": 3,
+   "egg": 1
+  },
+  "stamina": 2,
+  "image": "assets/items/dishes/udon.png"
  }
 }

@@ -389,6 +389,16 @@
    "lower_leg_l": [
     "tpl_pants_lower_leg_l.png"
    ]
+  },
+  "kid_sideponytail_hair": {
+   "head": [
+    "kid_sideponytail_hair.png"
+   ]
+  },
+  "kid_sideponytailhl_hair": {
+   "head": [
+    "kid_sideponytailhl_hair.png"
+   ]
   }
  },
  "garmentAfter": {
