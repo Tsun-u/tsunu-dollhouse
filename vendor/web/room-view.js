@@ -304,13 +304,18 @@ export class RoomView {
   drawBubble(character) {
     const bubble = character.bubble;
     if (!bubble || performance.now() > bubble.until) return;
-    const { ctx } = this;
     const [sx, sy] = this.toScreen(character.pos.x + 0.5, character.pos.y + 0.5);
+    this.bubbleAt(sx, sy - CHARACTER_HEIGHT - 6, bubble.text);
+  }
+
+  /** 畫一個對話框：底邊在 bottom，尖角朝下指著 sx。 */
+  bubbleAt(sx, bottom, text) {
+    const { ctx } = this;
     ctx.save();
     ctx.font = "13px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    const lines = wrapText(ctx, bubble.text, 150);
+    const lines = wrapText(ctx, text, 150);
     const w = Math.max(...lines.map((line) => ctx.measureText(line).width)) + 20, h = lines.length * 17 + 12;
-    const x = sx - w / 2, y = sy - CHARACTER_HEIGHT - h - 6;
+    const x = sx - w / 2, y = bottom - h;
     ctx.fillStyle = "#fff"; ctx.strokeStyle = "#cdb593"; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(sx - 6, y + h); ctx.lineTo(sx, y + h + 8); ctx.lineTo(sx + 6, y + h); ctx.closePath(); ctx.fill();
@@ -453,7 +458,7 @@ export class RoomView {
   loadImage(item) {
     const spec = this.catalog[item];
     const dyeMask = (src) => (spec?.dye && src ? src.replace(/\.png(\?|$)/, "_dye.png$1") : null);   // 布面可換色的家具：旁邊放一張同名 _dye 遮罩
-    const sources = [[item, spec?.image], [`${item}:back`, spec?.back?.image], [`${item}:front`, spec?.front], [`${item}:back:front`, spec?.back?.front],[`${item}:dye`, dyeMask(spec?.image)], [`${item}:back:dye`, dyeMask(spec?.back?.image)], [`${item}:front:dye`, dyeMask(spec?.front)], [`${item}:back:front:dye`, dyeMask(spec?.back?.front)], [`${item}:blanket`, spec?.blanket]];
+    const sources = [[item, spec?.image], [`${item}:back`, spec?.back?.image], [`${item}:front`, spec?.front], [`${item}:back:front`, spec?.back?.front],[`${item}:dye`, dyeMask(spec?.image)], [`${item}:back:dye`, dyeMask(spec?.back?.image)], [`${item}:front:dye`, dyeMask(spec?.front)], [`${item}:back:front:dye`, dyeMask(spec?.back?.front)], [`${item}:blanket`, spec?.blanket], [`${item}:on`, spec?.tv?.image]];
     for (const [key, src] of sources) {
       if (!src || key in this.images) continue;
       const img = new Image();
@@ -872,6 +877,13 @@ export class RoomView {
 
   /** 兩人坐在同一件家具上時，兩句話併成一個共用的對話框；否則各自冒。 */
   drawBubbles() {
+    for (const piece of this.home.placed) {   // 開著的電視上面寫正在播什麼
+      const spec = this.catalog[piece.item];
+      if (!spec?.tv || !piece.on || !piece.program) continue;
+      const { w, d } = this.footprint(piece);
+      const [sx, sy] = this.toScreen(piece.x + w / 2, piece.y + d / 2);
+      this.bubbleAt(sx, sy - spec.height * UNIT_H * (spec.size ?? 1) - 10, `正在播：${piece.program}`);
+    }
     const now = performance.now();
     const talking = this.characters.filter((who) => who.bubble && now < who.bubble.until);
     if (talking.length === 2) {
@@ -1127,7 +1139,8 @@ export class RoomView {
     const spec = this.catalog[piece.item];
     const away = this.facesAway(piece);
     const frontLayer = layer !== null;
-    const key = layer === "front" ? `${piece.item}${away ? ":back" : ""}:front` : away ? `${piece.item}:back` : piece.item;
+    const lit = !frontLayer && piece.on && spec.tv && this.images[`${piece.item}:on`]?.bounds;   // 電視開著：換成螢幕亮著的那張（還沒載到就先畫關著的）
+    const key = layer === "front" ? `${piece.item}${away ? ":back" : ""}:front` : away ? `${piece.item}:back` : lit ? `${piece.item}:on` : piece.item;
     const base = piece.tint && spec.dye ? this.tinted(key, piece.tint) : this.images[key];
     const image = layer === "blanket" ? this.blanketCover(piece, base) : base;
     if (frontLayer && !image?.bounds) return;   // 前景層還沒載到就先不蓋，不退回色塊

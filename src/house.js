@@ -272,6 +272,7 @@ export class House {
       }
     }
     if (spec?.switch) actions.push(button(piece.on ? "關燈" : "開燈", () => this.act({ kind: "toggle", id: piece.id }), ""));
+    if (spec?.tv) actions.push(button(piece.on ? "關電視" : "開電視", () => this.act({ kind: "toggle", id: piece.id }), ""));
     if (spec?.readable && this.deps.content.fortunes.length) actions.push(button("翻書", () => this.act({ kind: "read", id: piece.id }), ""));
     if (spec?.plant) actions.push(button("澆水", () => this.act({ kind: "water", id: piece.id }), ""));
     if (spec?.washbasin && doll) {   // 洗手台：洗手、刷牙；同一間房的娃娃可以一起刷牙（兩人各自走到旁邊、各自刷）

@@ -602,7 +602,7 @@ function reduce(state, action, context) {
             return feedDog(state, context.content, action.dog, action.food, context.now());
         }
         case "toggle":
-            return toggleSwitch(state, furniture, action.id);
+            return toggleSwitch(state, furniture, action.id, context.seed());
         case "read": {
             if (context.actor === "game")
                 throw new Error("小屋自己不看書。");
@@ -1070,11 +1070,17 @@ export function feedDog(state, content, dogId, food, now) {
     const hungry = isHungry(state, dogId, now);
     return { state: { ...state, fed: { ...state.fed, [dogId]: now.toISOString() } }, note: hungry ? `餵${dog.label}吃飯，${dog.label}餓壞了，吃得好快` : `餵${dog.label}吃飯` };
 }
-export function toggleSwitch(state, catalog, id) {
+export function toggleSwitch(state, catalog, id, seed) {
     const { piece } = findPlaced(state, id);
-    if (!catalog[piece.item]?.switch)
+    const tv = catalog[piece.item]?.tv;
+    if (!catalog[piece.item]?.switch && !tv)
         throw new Error(`${furnitureLabel(catalog, piece.item)}沒有開關。`);
     const on = !piece.on;
+    const { program: _, ...rest } = piece;
+    if (tv) { // 電視：打開時抽一個節目記在電視上，畫面與描述都讀這個
+        const program = tv.programs[Math.abs(Math.floor(seed)) % tv.programs.length];
+        return on ? { state: replacePlaced(state, { ...rest, on, program }), note: `打開電視，正在播${program}` } : { state: replacePlaced(state, { ...rest, on }), note: "關掉電視" };
+    }
     return { state: replacePlaced(state, { ...piece, on }), note: `把${furnitureLabel(catalog, piece.item)}${on ? "打開" : "關掉"}` };
 }
 /** 翻書抽一句：從 lines 裡抽（屋主抽籤詩＋書櫃的句子，訪客只抽籤詩）。 */

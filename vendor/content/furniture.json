@@ -356,6 +356,21 @@
   "height": 1.1,
   "color": "#b48a55",
   "price": 480,
+  "tv": {
+   "image": "assets/furniture/tv_on.png",
+   "programs": [
+    "天氣預報",
+    "料理節目",
+    "動物星球",
+    "卡通",
+    "旅遊節目",
+    "綜藝節目",
+    "晚間新聞",
+    "自然紀錄片",
+    "偶像劇",
+    "棒球轉播"
+   ]
+  },
   "image": "assets/furniture/tv.png",
   "anchor": {
    "x": 675,
