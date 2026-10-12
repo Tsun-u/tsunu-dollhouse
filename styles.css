@@ -266,6 +266,8 @@ button:disabled { background: var(--line); color: var(--muted); cursor: default;
 #creatorCanvas { width: 100%; aspect-ratio: 2 / 3; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
 .option-group { margin-bottom: 10px; }
 .option-group h3 { font-size: 14px; margin: 0 0 6px; color: var(--muted); font-weight: 600; }
+.offset-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }   /* 五官高度滑桿 */
+.offset-row input { flex: 1; max-width: 260px; accent-color: var(--accent); }
 .swatches { display: flex; flex-wrap: wrap; gap: 6px; }
 .swatches button { width: 32px; height: 32px; padding: 0; border-radius: 50%; border: 2px solid var(--line); }
 .swatches button.on { border-color: var(--ink); box-shadow: 0 0 0 2px var(--panel) inset; }

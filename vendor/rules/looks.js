@@ -45,8 +45,8 @@ export const FACES = [
 ];
 /** 嘴巴：id 跟同一張圖畫出來的眼睛一樣（舊存檔沒選過嘴巴，就配這一款）。lips 是唇色灰稿，可以擦口紅。 */
 export const MOUTHS = [
-    { id: "kid_f_smile", body: "f", label: "微笑", mouth: "kid_f_smile_mouth", lips: "kid_f_smile_lips" },
-    { id: "kid_f_round", body: "f", label: "彎彎嘴", mouth: "kid_f_round_mouth", lips: "kid_f_round_lips" },
+    { id: "kid_f_smile", body: "f", label: "微笑", mouth: "kid_f_smile_mouth", lips: "kid_f_smile_lips", drop: 7 }, // 這兩款的嘴線比下垂眼高 5～6 px（畫面上，頭縮放 0.85），往下對齊
+    { id: "kid_f_round", body: "f", label: "彎彎嘴", mouth: "kid_f_round_mouth", lips: "kid_f_round_lips", drop: 7 },
     { id: "kid_f_droopy", body: "f", label: "小小微笑", mouth: "kid_f_droopy_mouth", lips: "kid_f_droopy_lips" },
     { id: "kid_f_grin", body: "f", label: "張嘴大笑", mouth: "kid_f_grin_mouth", lips: "kid_f_grin_lips" },
     { id: "gentle", body: "f", label: "溫柔", mouth: "kid_f_atone_mouth", lips: "kid_f_atone_lips" },
@@ -71,6 +71,9 @@ export const LIP_COLORS = ["#e8a48c", "#e2a0a0", "#de9a96", "#d65a6e", "#c86478"
 export const CLOTHES_COLORS = ["#b9b9b9", "#f2f2ee", "#f4b3c2", "#e07a7a", "#f2dc8c", "#9fd8c9", "#a9c8ee", "#4a6a9c", "#c9b6e4", "#c8a070", "#6b8f5a", "#3b3b44"];
 /** 小屋保留給阿童、阿宇本人的長相：人類和 AI 訪客挑不到，免得有人冒充屋主（眼鏡開放；隨機客人不受限）。 */
 export const HOST_LOOKS = new Set(["curly_short", "tousled", "gentle", "calm"]);
+/** 五官高度可以調的範圍（原圖 px）。 */
+export const FACE_OFFSET_MAX = 12;
+export const isFaceOffset = (value) => Number.isInteger(value) && Math.abs(value) <= FACE_OFFSET_MAX;
 const BROW_SHADE = 0.8; // 眉毛是髮色的幾倍亮
 /** 某個素體、某類選項裡，骨架檔真的有的那幾個。 */
 export function available(options, body, skeletonOutfits) {
@@ -86,11 +89,13 @@ export function headParts(looks) {
     const mouth = MOUTHS.find((option) => option.id === (looks.mouth ?? looks.face));
     const hair = HAIRS.find((option) => option.id === looks.hair);
     const glasses = GLASSES.find((option) => option.id === looks.glasses);
+    const eyeDy = looks.eyeOffset ?? 0;
+    const mouthDy = (mouth?.drop ?? 0) + (looks.mouthOffset ?? 0);
     return [
-        ...(face ? [{ name: face.iris, tint: looks.irisColor }] : []),
-        ...(mouth ? [{ name: mouth.lips, tint: looks.lipColor ?? LIP_COLORS[0] }] : []),
-        ...(face ? [face.face, { name: face.brows, tint: browColor(looks.hairColor) }] : []),
-        ...(mouth ? [mouth.mouth] : []),
+        ...(face ? [part(face.iris, looks.irisColor, eyeDy)] : []),
+        ...(mouth ? [part(mouth.lips, looks.lipColor ?? LIP_COLORS[0], mouthDy)] : []),
+        ...(face ? [part(face.face, null, eyeDy), part(face.brows, browColor(looks.hairColor), eyeDy)] : []),
+        ...(mouth ? [part(mouth.mouth, null, mouthDy)] : []),
         ...(hair ? [{ name: hair.outfit, tint: looks.hairColor }] : []),
         ...(hair?.highlight && looks.hairHighlight ? [{ name: hair.highlight, tint: looks.hairHighlight }] : []), // 挑染疊在頭髮上，照原本的明暗染第二個顏色
         ...(glasses ? [{ name: glasses.outfit, tint: glasses.tint }] : []),
@@ -108,6 +113,12 @@ export function randomLooks(pick, body, skeletonOutfits) {
         mouth: mouth?.id ?? null, lipColor: pick(LIP_COLORS) ?? LIP_COLORS[0],
         glasses: null,
     };
+}
+/** 一個頭部零件：沒顏色、沒移動就只寫套名。 */
+function part(name, tint, dy) {
+    if (!tint && !dy)
+        return name;
+    return { name, ...(tint ? { tint } : {}), ...(dy ? { dy } : {}) };
 }
 /** 這個選項要在骨架裡找的套名：髮型、眼鏡是 outfit，眼睛是 face，嘴巴是 mouth。 */
 function partName(option) {

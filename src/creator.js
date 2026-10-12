@@ -1,7 +1,7 @@
 // 捏娃娃畫面：左邊預覽（可轉三個角度），右邊一組一組的選項；按「好了」交給 onSave。
 // 衣服不在這裡選：新娃娃穿基本款，之後在衣櫃換。
 
-import { BODIES, FACES, GLASSES, HAIRS, MOUTHS, HAIR_COLORS, IRIS_COLORS, LIP_COLORS, SKIN_TONES, available, headParts } from "../vendor/rules/looks.js";
+import { BODIES, FACES, FACE_OFFSET_MAX, GLASSES, HAIRS, MOUTHS, HAIR_COLORS, IRIS_COLORS, LIP_COLORS, SKIN_TONES, available, headParts } from "../vendor/rules/looks.js";
 import { swatchRow } from "../vendor/web/swatches.js";
 import { createDoll } from "./dolls.js";
 
@@ -36,6 +36,13 @@ export function setupCreator({ skeletons, animations, samplePose, clothes, dress
   };
   const set = (changes) => { draft = { ...draft, ...changes }; render(); };
 
+  /** 五官高度滑桿：中間是預設，往左往上、往右往下。拖的時候只改草稿、不重建面板（預覽每一格都重畫），滑桿才不會被換掉拖不動。 */
+  function offsetSlider(key) {
+    const input = Object.assign(document.createElement("input"), { type: "range", className: "offset", min: -FACE_OFFSET_MAX, max: FACE_OFFSET_MAX, step: 1, value: draft[key] ?? 0 });
+    input.oninput = () => { draft = { ...draft, [key]: Number(input.value) }; };
+    return row("offset-row", [Object.assign(document.createElement("span"), { textContent: "往上" }), input, Object.assign(document.createElement("span"), { textContent: "往下" })]);
+  }
+
   function render() {
     const face = FACES.find((f) => f.id === draft.face);
     const mouthId = draft.mouth ?? draft.face;
@@ -54,7 +61,9 @@ export function setupCreator({ skeletons, animations, samplePose, clothes, dress
       group(highlightable ? "挑染" : "挑染（這款沒有挑染）", row("chips", [chip("不挑染", !draft.hairHighlight, () => set({ hairHighlight: null }))]), swatchRow(HAIR_COLORS, draft.hairHighlight ?? null, (hairHighlight) => set({ hairHighlight }), !highlightable)),
       group("眼睛", row("chips", options(FACES, draft.body).map((f) => chip(f.label, draft.face === f.id, () => set({ face: f.id, mouth: mouthId }))))),
       group(face?.iris ? "眼睛顏色" : "眼睛顏色（這款維持原本的顏色）", swatchRow(IRIS_COLORS, draft.irisColor, (irisColor) => set({ irisColor }), !face?.iris)),
+      group("眼睛高度", offsetSlider("eyeOffset")),
       group("嘴巴", row("chips", options(MOUTHS, draft.body).map((m) => chip(m.label, mouthId === m.id, () => set({ mouth: m.id }))))),
+      group("嘴巴高度", offsetSlider("mouthOffset")),
       group(mouth?.lips ? "口紅" : "口紅（這款維持原本的唇色）", swatchRow(LIP_COLORS, draft.lipColor ?? LIP_COLORS[0], (lipColor) => set({ lipColor }), !mouth?.lips)),
       group("眼鏡", row("chips", [chip("不戴", !draft.glasses, () => set({ glasses: null })), ...options(GLASSES, draft.body).map((g) => chip(g.label, draft.glasses === g.id, () => set({ glasses: g.id })))])),
     );

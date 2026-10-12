@@ -432,8 +432,8 @@ export class Skeleton {
     const resolve = (outfit) => {
       const entry = typeof outfit === "string" ? { name: outfit, tint: null } : outfit;
       if (this.data.outfits?.[entry.name] || !entry.fallback) return entry;
-      const { outer, tuck, top, bones, sleeved } = entry;
-      return { ...resolve(entry.fallback), outer, tuck, top, bones, sleeved };   // 換成備用套也還是外套、一樣紮進下身、一樣只蓋上半身、一樣只畫那幾根骨頭
+      const { outer, tuck, top, bones, sleeved, dy } = entry;
+      return { ...resolve(entry.fallback), outer, tuck, top, bones, sleeved, dy };   // 換成備用套也還是外套、一樣紮進下身、一樣只蓋上半身、一樣只畫那幾根骨頭、一樣往下移
     };
     const wearing = outfits.map(resolve);
     const world = this.solve(pose);
@@ -447,7 +447,7 @@ export class Skeleton {
     const deferred = new Map();   // 等某根骨頭畫完才畫的衣服：骨頭名 → [{ transform, pivot, pieces }]
     const placed = new Map();     // 已經畫過的骨頭 → 它的座標轉換（補片用軀幹的褲頭片當遮罩）
     const drawPieces = (list, pivot, bodyColor, target = ctx) => {
-      for (const { slot, tint, coat } of list) {
+      for (const { slot, tint, coat, dy = 0 } of list) {
         if (!this.images[slot]) { this.requestPart(slot); continue; }
         const isSkin = slot.includes("skin_");
         const look = tint ? this.dyed(slot, tint)
@@ -457,7 +457,7 @@ export class Skeleton {
           : this.images[slot];
         const image = coat ? this.insideCoat(look, slot, tint, coat) : look;
         const [ox, oy] = this.offsetOf(slot);
-        target.drawImage(image, ox - pivot[0], oy - pivot[1]);
+        target.drawImage(image, ox - pivot[0], oy - pivot[1] + dy);   // dy：整套往下移（捏角調五官高度），骨頭座標
       }
     };
     // 延後畫的一組零件；帶 mask（軀幹皮膚）時只畫在軀幹範圍外：遠側外套袖子要蓋過裡面衣服露在肩膀外的邊，卻不能跑到胸口前面。
@@ -478,10 +478,10 @@ export class Skeleton {
     // 外套有軀幹片時，比它先穿的衣服的軀幹片挖掉外套外緣以外的部分：蓬起來的裙子才不會從遠側窄窄的前襟外面露出來。
     // 只挖軀幹片：跟外套一樣在軀幹座標裡、不會轉開；大腿片和裙襬坐下時會往前伸，不挖
     const coatOver = (index) => wearing.find((entry, later) => later > index && entry.outer && this.data.outfits?.[entry.name]?.torso?.length);
-    const pieces = (key) => wearing.flatMap(({ name: outfit, tint, tuck, bones, sleeved }, index) => {
+    const pieces = (key) => wearing.flatMap(({ name: outfit, tint, tuck, bones, sleeved, dy }, index) => {
       if (sleeveCovered(index, key) || (bones && !bones.includes(key))) return [];
       const coat = key === "torso" ? this.data.outfits?.[coatOver(index)?.name]?.torso : undefined;
-      const own = (this.data.outfits?.[outfit]?.[key] ?? []).map(slot => ({ slot, tint, index, after: afterOf(outfit, key, slot), coat }));
+      const own = (this.data.outfits?.[outfit]?.[key] ?? []).map(slot => ({ slot, tint, index, after: afterOf(outfit, key, slot), coat, dy }));
       // 裙襬（鍵 hem）畫在同一套的軀幹片底下、跟它一起延後（蓋在大腿和身體上），畫的時候繞髖部轉（hemSpace）；
       // 走路時兩腿一起往前也會小轉一點，裙襬上緣靠軀幹片蓋住才不會露出歪掉的腰帶
       const hem = key === "torso" ? (this.data.outfits?.[outfit]?.hem ?? []).map(slot => ({ slot, tint, index, after: afterOf(outfit, "torso", slot), hem: true })) : [];
