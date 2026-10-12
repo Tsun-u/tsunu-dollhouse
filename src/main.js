@@ -173,6 +173,22 @@ window.addEventListener("resize", fitScenes);
 
 // ───────── 家具店 ─────────
 
+/** 家具店的裝潢這間房：選取的娃娃所在那間房的地板與壁紙，使用中的亮著。 */
+function renderRoomDecor(chip) {
+  const { state } = game;
+  const here = state.rooms[house.roomId] ? house.roomId : "bedroom";
+  const current = state.rooms[here];
+  $("decorTitle").textContent = `裝潢${current.name}（娃娃走到別間房就能裝潢那間）`;
+  const row = (kind, list, fallback) => Object.entries(list).map(([id, spec]) => {
+    const using = (current[kind] ?? fallback) === id;
+    const choice = chip(`${spec.label}<span class="price">${using ? "使用中" : spec.price ? `$${spec.price}` : "免費"}</span>`, using || state.money < spec.price, () => apply({ kind: "decorate_room", room: here, [kind]: id }));
+    choice.classList.toggle("on", using);
+    return choice;
+  });
+  $("floorList").replaceChildren(...row("floor", content.surfaces.floors, "tile"));
+  $("wallList").replaceChildren(...row("wall", content.surfaces.walls, "plain"));
+}
+
 function renderShop() {
   const { state } = game;
   $("shopMoney").textContent = `錢：$${state.money}。買到的家具進倉庫。`;
@@ -184,6 +200,7 @@ function renderShop() {
   $("buildList").replaceChildren(...unbuilt.map(([id, spec]) =>
     chip(`蓋${spec.label}（${spec.width}×${spec.depth}）<span class="price">$${spec.price}</span>`, state.money < spec.price, () => apply({ kind: "build_room", room: id }))));
   if (!unbuilt.length) $("buildList").textContent = "能蓋的房間都蓋好了。";
+  renderRoomDecor(chip);
   $("clothesShop").replaceChildren(...Object.entries(content.clothes).map(([item, spec]) =>
     chip(`${swatch(spec.color)}${spec.label}<span class="price">$${spec.price}</span>`, state.money < spec.price, () => apply({ kind: "buy_clothes", item }))));
   $("resaleList").replaceChildren(...Object.entries(state.inventory).map(([item, count]) => {
@@ -295,6 +312,8 @@ function renderCloset() {
   const wearable = (item) => content.clothes[item] && (!content.clothes[item].wearers || content.clothes[item].wearers.includes(BODIES[doll.body].sprites));   // 男生、女生素體各有各的衣服
   const items = [...new Set([...starter, ...Object.keys(game.state.wardrobe)])].filter(wearable);
   const colorOf = (item) => colors[item] ?? content.clothes[item].color;
+  const wearers = (item) => dollsSave.dolls.filter((d) => Object.values(d.worn).includes(item) && !Object.values(BODIES[d.body].starter).includes(item)).length;
+  const sellable = (item) => (game.state.wardrobe[item] ?? 0) > wearers(item);   // 衣櫃裡比穿著它的娃娃多的才能賣（基本款每個娃娃都有，不算）
   // 照格子由內到外分組，每格一行標題；點了試穿，已經穿著的再點一次是脫掉那一格；穿著的那件下面一排色票換顏色；按存檔才寫進娃娃
   $("wardrobe").replaceChildren(...Object.keys(SLOT_LABEL).flatMap((slot) => {
     const inSlot = items.filter((item) => CATEGORY_SLOT[content.clothes[item].category] === slot);
@@ -305,6 +324,10 @@ function renderCloset() {
       const chip = Object.assign(document.createElement("button"), { className: "item" + (on ? " on" : "") });
       chip.innerHTML = `<span class="swatch" style="background:${colorOf(item)}"></span>${content.clothes[item].label}`;
       chip.onclick = () => editCloset(doll, (current) => { const { [slot]: _, ...rest } = current.worn; return { worn: on ? rest : { ...current.worn, [slot]: item } }; });
+      if (sellable(item)) chip.append(Object.assign(document.createElement("span"), {
+        className: "sell", role: "button", textContent: `賣 $${Math.floor(content.clothes[item].price / 2)}`,
+        onclick: (e) => { e.stopPropagation(); apply({ kind: "sell_clothes", item }); },
+      }));
       return chip;
     });
     const wearing = worn[slot];

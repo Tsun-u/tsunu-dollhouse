@@ -1,11 +1,12 @@
 // 家：房間畫面裡的娃娃、家具、狗。畫面沿用小屋的 RoomView 與 Pets；娃娃的位置存在娃娃存檔，家具與房間交給遊戲存檔。
 // 畫面跟著「目前選取的娃娃」在哪一間房；同一間房的娃娃都畫出來。
 
-import { BODIES, headParts } from "../vendor/rules/looks.js";
+import { BODIES, CLOTHES_COLORS, headParts } from "../vendor/rules/looks.js";
 import { cuddleSpot, openCells, pillowSpot, seatAt } from "../vendor/rules/state.js";
 import { createGestures } from "../vendor/web/gestures.js";
 import { Pets } from "../vendor/web/pets.js";
 import { RoomView } from "../vendor/web/room-view.js";
+import { swatchRow } from "../vendor/web/swatches.js";
 
 const $ = (id) => document.getElementById(id);
 const WAVE_MS = 3200;
@@ -23,6 +24,7 @@ export class House {
     this.tappedCell = null;
     this.sleepingOn = null;    // 一起睡的那張床的 id；有人起來就結束
     this.dogOpen = null;
+    this.paintingId = null;    // 打開布面色盤的那件家具
     const { content } = deps;
     this.room = new RoomView($("room"), content.furniture, {
       onCellTap: (cell) => this.tapCell(cell),
@@ -34,6 +36,7 @@ export class House {
       bathFacesFront: () => false,   // 泡澡一律背影、一個人泡
     });
     this.room.pets = new Pets(content.pets, this.room);
+    this.room.surfaces = content.surfaces;   // 地板、壁紙的花紋
     this.play = createGestures(this.room, content.pets);   // 把日誌那句演出來：刷牙洗手、狗跳、吃飯、撿球、翻書的泡泡
     $("flipBtn").onclick = () => this.selectedPiece && deps.apply({ kind: "flip", id: this.selectedPiece });
     $("storeBtn").onclick = () => { if (this.selectedPiece) { deps.apply({ kind: "store", id: this.selectedPiece }); this.selectPiece(null); } };
@@ -281,7 +284,15 @@ export class House {
       if (spec?.bowl) actions.push(button(`倒飼料給${pet.label}`, () => this.act({ kind: "feed", dog, food: "meal" }), ""));
       if (spec?.snacks) actions.push(button(`拿零食給${pet.label}`, () => this.act({ kind: "feed", dog, food: "snack" }), ""));
     }
+    if (spec?.dye) actions.push(button(this.paintingId === piece.id ? "收起顏色" : "換顏色", () => { this.paintingId = this.paintingId === piece.id ? null : piece.id; this.renderPieceActions(); }, ""));
     $("pieceActions").replaceChildren(...actions);
+    const painting = spec?.dye && this.paintingId === piece.id;   // 布面色盤：原色＋衣服的色票＋自訂顏色
+    $("piecePalette").hidden = !painting;
+    if (painting) {
+      const paint = (color) => this.act({ kind: "paint_furniture", id: piece.id, color });
+      $("piecePalette").replaceChildren(Object.assign(document.createElement("span"), { textContent: `${spec.label}的布面` }),
+        button("原色", () => paint(null), "reset"), swatchRow(CLOTHES_COLORS, piece.tint ?? null, paint));
+    }
   }
 
   /** 選取的娃娃跟同一間房的其他娃娃能做的事。 */

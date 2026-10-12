@@ -132,6 +132,18 @@ button:disabled { background: var(--line); color: var(--muted); cursor: default;
 #decorChoices button.chosen { outline: 2px solid #c98a4a; font-weight: bold; }
 .rent button.quiet, #cafeProducts button.quiet { background: var(--line); color: var(--ink); }
 
+/* 家具店的裝潢這間房：地板、壁紙兩排 */
+.decor-row { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; }
+.decor-label { flex: none; font-size: 13px; color: var(--muted); width: 2.5em; }
+
+/* 家具換布面的色盤 */
+.palette { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; margin: 8px 0; font-size: 13px; color: var(--muted); }
+.palette[hidden] { display: none; }
+.palette button.reset { font-size: 12px; background: var(--line); color: var(--ink); }
+
+/* 衣櫃裡賣得掉的衣服 */
+.item .sell { margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: var(--line); color: var(--ink); font-size: 12px; cursor: pointer; }
+
 #puzzleShop { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; font-size: 14px; }
 
 #room {

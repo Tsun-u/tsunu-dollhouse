@@ -39,6 +39,7 @@
       <button id="flipBtn" disabled>轉向</button>
       <button id="storeBtn" disabled>收回倉庫</button>
     </div>
+    <div id="piecePalette" class="palette" hidden></div>
     <canvas id="room"></canvas>
     <div id="dollPanel" hidden>
       <div class="panel-head"><span id="dollPanelTitle"></span></div>
@@ -103,6 +104,9 @@
     <div id="shopList" class="chips"></div>
     <div class="panel-head"><span>蓋房間</span></div>
     <div id="buildList" class="chips"></div>
+    <div class="panel-head"><span id="decorTitle"></span></div>
+    <div class="decor-row"><span class="decor-label">地板</span><div id="floorList" class="chips"></div></div>
+    <div class="decor-row"><span class="decor-label">壁紙</span><div id="wallList" class="chips"></div></div>
     <div class="panel-head"><span>衣服（買到的進衣櫃）</span></div>
     <div id="clothesShop" class="chips"></div>
     <div class="panel-head"><span>倉庫裡的家具（點一下賣回，半價）</span></div>

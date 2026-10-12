@@ -18,9 +18,12 @@ export function contentFrom(read) {
   return Object.fromEntries(CONTENT_FILES.map((name) => [name, read(name)]));
 }
 
+/** 兒童版的娃娃穿什麼記在娃娃存檔：規則裡阿童、阿宇的穿著清空，賣衣服時規則才不會拿那份擋（有沒有娃娃穿著由畫面算）。 */
+const forDolls = (state) => ({ ...state, worn: { atone: {}, tsunu: {} } });
+
 export function createGame(content, storage, clock = () => new Date()) {
   const saved = storage.getItem(GAME_KEY);
-  let state = restore(saved ? JSON.parse(saved) : undefined, content);
+  let state = forDolls(restore(saved ? JSON.parse(saved) : undefined, content));
   const listeners = new Set();
   const context = {
     content, actor: "atone", now: clock,
@@ -39,7 +42,7 @@ export function createGame(content, storage, clock = () => new Date()) {
     },
     /** 整份換掉（匯入存檔用）：先照目前規則升級舊格式。 */
     replace(snapshot) {
-      state = restore(snapshot, content);
+      state = forDolls(restore(snapshot, content));
       storage.setItem(GAME_KEY, JSON.stringify(state));
       for (const listener of listeners) listener(state);
     },

@@ -42,6 +42,15 @@ test("帶上娃娃（doer）的動作，日誌記她的名字", () => {
   assert.equal(game.state.journal.at(-1).who, undefined);
 });
 
+test("遊戲存檔裡阿童、阿宇的穿著是空的（娃娃穿什麼記在娃娃存檔），衣櫃的基本款賣得掉", () => {
+  const game = createGame(content, memoryStorage());
+  assert.deepEqual(game.state.worn, { atone: {}, tsunu: {} });
+  const item = Object.keys(game.state.wardrobe)[0];
+  const before = game.state.money;
+  game.apply({ kind: "sell_clothes", item });
+  assert.ok(game.state.money > before);
+});
+
 test("訂閱者在每次成功的動作後收到新狀態", () => {
   const game = createGame(content, memoryStorage());
   const seen = [];
