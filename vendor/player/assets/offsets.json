@@ -363,6 +363,26 @@
 372,
 406
 ],
+"front34_tpl_pants_lower_leg_l.png": [
+487,
+955
+],
+"front34_tpl_pants_lower_leg_r.png": [
+410,
+948
+],
+"front34_tpl_pants_torso.png": [
+389,
+627
+],
+"front34_tpl_pants_upper_leg_l.png": [
+465,
+660
+],
+"front34_tpl_pants_upper_leg_r.png": [
+377,
+641
+],
 "front34_tpl_pinafore_hem.png": [
 312,
 632
@@ -786,6 +806,26 @@
 "front_tpl_dress_torso.png": [
 404,
 404
+],
+"front_tpl_pants_lower_leg_l.png": [
+528,
+985
+],
+"front_tpl_pants_lower_leg_r.png": [
+402,
+985
+],
+"front_tpl_pants_torso.png": [
+396,
+614
+],
+"front_tpl_pants_upper_leg_l.png": [
+511,
+732
+],
+"front_tpl_pants_upper_leg_r.png": [
+394,
+732
 ],
 "front_tpl_pinafore_hem.png": [
 325,
@@ -2078,6 +2118,26 @@
 "tpl_dress_torso.png": [
 376,
 408
+],
+"tpl_pants_lower_leg_l.png": [
+412,
+972
+],
+"tpl_pants_lower_leg_r.png": [
+486,
+978
+],
+"tpl_pants_torso.png": [
+382,
+620
+],
+"tpl_pants_upper_leg_l.png": [
+382,
+676
+],
+"tpl_pants_upper_leg_r.png": [
+475,
+674
 ],
 "tpl_pinafore_hem.png": [
 303,

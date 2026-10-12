@@ -559,6 +559,23 @@
    "head:behind": [
     "front_kid_ponytailhl_hair_back.png"
    ]
+  },
+  "tpl_pants": {
+   "torso": [
+    "front_tpl_pants_torso.png"
+   ],
+   "upper_leg_l": [
+    "front_tpl_pants_upper_leg_l.png"
+   ],
+   "upper_leg_r": [
+    "front_tpl_pants_upper_leg_r.png"
+   ],
+   "lower_leg_l": [
+    "front_tpl_pants_lower_leg_l.png"
+   ],
+   "lower_leg_r": [
+    "front_tpl_pants_lower_leg_r.png"
+   ]
   }
  },
  "outfitAfter": {

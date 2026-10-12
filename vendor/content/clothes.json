@@ -16,10 +16,7 @@
   "label": "長褲",
   "category": "pants",
   "color": "#b9b9b9",
-  "price": 120,
-  "wearers": [
-   "tsunu"
-  ]
+  "price": 120
  },
  "shoes_gray": {
   "label": "帆布鞋",
