@@ -6,17 +6,22 @@ export const BODIES = {
 };
 /** 頭髮都是灰稿，照髮色染。 */
 export const HAIRS = [
-    { id: "kid_straightbob", body: "f", label: "鮑伯頭", outfit: "kid_straightbob_hair" },
-    { id: "kid_ponytail", body: "f", label: "馬尾", outfit: "kid_ponytail_hair" },
-    { id: "kid_long", body: "f", label: "長髮", outfit: "kid_long_hair" },
+    { id: "kid_straightbob", body: "f", label: "鮑伯頭", outfit: "kid_straightbob_hair", highlight: "kid_straightbobhl_hair" },
+    { id: "kid_ponytail", body: "f", label: "馬尾", outfit: "kid_ponytail_hair", highlight: "kid_ponytailhl_hair" },
+    { id: "kid_long", body: "f", label: "長髮", outfit: "kid_long_hair", highlight: "kid_longhl_hair" },
     { id: "kid_twintails", body: "f", label: "雙馬尾", outfit: "kid_twintails_hair" },
     { id: "kid_bun", body: "f", label: "丸子頭", outfit: "kid_bun_hair" },
     { id: "kid_pixie", body: "f", label: "俏麗短髮", outfit: "kid_pixie_hair" },
     { id: "kid_twinbuns", body: "f", label: "雙包頭", outfit: "kid_twinbuns_hair" },
     { id: "kid_braids", body: "f", label: "雙辮子", outfit: "kid_braids_hair" },
     { id: "kid_waves", body: "f", label: "大波浪長髮", outfit: "kid_waves_hair" },
+    { id: "kid_himecut", body: "f", label: "公主切", outfit: "kid_himecut_hair" },
+    { id: "kid_longstraight", body: "f", label: "及腰長直髮", outfit: "kid_longstraight_hair", highlight: "kid_longstraighthl_hair" },
+    { id: "kid_fluffylong", body: "f", label: "蓬鬆長髮", outfit: "kid_fluffylong_hair" },
+    { id: "kid_bunwaves", body: "f", label: "雙包頭長捲髮", outfit: "kid_bunwaves_hair" },
+    { id: "kid_lowponytail", body: "f", label: "低馬尾", outfit: "kid_lowponytail_hair" },
     { id: "curly_short", body: "f", label: "捲捲短髮", outfit: "kid_atone_hair" },
-    { id: "kid_short", body: "m", label: "清爽短髮", outfit: "kid_short_hair" },
+    { id: "kid_short", body: "m", label: "清爽短髮", outfit: "kid_short_hair", highlight: "kid_shorthl_hair" },
     { id: "kid_wavy", body: "m", label: "微捲中長髮", outfit: "kid_wavy_hair" },
     { id: "kid_spiky", body: "m", label: "刺刺運動頭", outfit: "kid_spiky_hair" },
     { id: "kid_sidepart", body: "m", label: "旁分", outfit: "kid_sidepart_hair" },
@@ -56,6 +61,8 @@ export const GLASSES = [
     { id: "boston", body: "m", label: "波士頓框眼鏡", outfit: "kid_tsunu_glasses", tint: "#2c3e66" },
 ];
 export const SKIN_TONES = ["#ffe8d1", "#fbd9bd", "#f1c9a5", "#dcae86", "#b98460", "#8d5a3b"];
+/** 顏色是 #rrggbb：色票之外也可以自訂（捏角的膚色、髮色、眼睛、口紅、衣服）。 */
+export const isColor = (value) => typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
 export const HAIR_COLORS = ["#3b2a22", "#6b4a32", "#a8743f", "#e2c07a", "#f2efe8", "#c75c4a", "#e98fb0", "#6c8fd6"];
 export const IRIS_COLORS = ["#5b3a24", "#8a5a2b", "#3f6fa8", "#4f8a5b", "#7a5aa6", "#2b2b2b", "#c0843a", "#d05f7a"];
 export const LIP_COLORS = ["#e8a48c", "#e2a0a0", "#de9a96", "#d65a6e", "#c86478", "#b4505a", "#e07a5a", "#a8506e"]; // 第一個是自然唇色
@@ -84,6 +91,7 @@ export function headParts(looks) {
         ...(face ? [face.face, { name: face.brows, tint: browColor(looks.hairColor) }] : []),
         ...(mouth ? [mouth.mouth] : []),
         ...(hair ? [{ name: hair.outfit, tint: looks.hairColor }] : []),
+        ...(hair?.highlight && looks.hairHighlight ? [{ name: hair.highlight, tint: looks.hairHighlight }] : []), // 挑染疊在頭髮上，照原本的明暗染第二個顏色
         ...(glasses ? [{ name: glasses.outfit, tint: glasses.tint }] : []),
     ];
 }

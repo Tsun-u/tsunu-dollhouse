@@ -358,6 +358,11 @@
    "head": [
     "m_back34_kid_tsunu_hair.png"
    ]
+  },
+  "kid_shorthl_hair": {
+   "head": [
+    "m_back34_kid_shorthl_hair.png"
+   ]
   }
  },
  "scale": 1.05,

@@ -11,6 +11,8 @@ export const DEFAULT_WALL = "plain";
 export const HUNGRY_HOURS = 12; // 狗這麼久沒吃正餐就餓了
 export const FULL_HOURS = 3; // 吃完正餐這段時間內還飽，不再吃
 export const TABLE_SLOTS = 3;
+export const INVITE_MS = 3 * 60_000; // 訪客的邀請沒回應多久過期
+export const INVITE_RESULT_MS = 2 * 60_000; // 回應過的邀請留多久（讓邀請的人看到結果）
 export const FRESH_MS = 2 * 60 * 60_000; // 商品放桌上超過兩小時，熱的就涼了、冰的就退冰了
 /** 桌上商品現在的狀態：熱的「還溫／涼了」，冰的「還冰／退冰了」，常溫的一直是「放著」。 */
 export function tableFreshness(recipe, placedAt, now) {
@@ -42,7 +44,7 @@ export const QUIET_DAYS = 2; // 阿童這麼多天沒動靜，小屋記一筆
 export const ORDER_WEIGHT = 2; // 客人點的商品，它的材料在盤面裡多出現幾份（每位客人加一份，最多加這麼多）
 /** 門在房間最前面的角落；阿宇回家從這裡走進來。 */
 export const DOOR = { x: 7, y: 7 };
-const ACTOR_NAME = { atone: "阿童", tsunu: "阿宇" };
+export const ACTOR_NAME = { atone: "阿童", tsunu: "阿宇" };
 export const FIRST_ROOM = "bedroom";
 const HOME_SPOTS = { atone: { room: FIRST_ROOM, x: 6, y: 2 }, tsunu: { room: FIRST_ROOM, x: 2, y: 6 } };
 export const STARTER_INVENTORY = { sofa: 1, table: 1, bed: 1, bookshelf: 1, plant: 2, lamp: 1, rug: 1, dogbed: 2 };
@@ -78,9 +80,9 @@ export function createBedroom(placed, width = 8, depth = 8) {
 }
 /** 套用一個動作，回傳新狀態；不合法就丟錯、狀態不變。每個成功動作 revision +1，值得記的動作寫一筆日誌。 */
 export function applyAction(state, action, context) {
-    const { state: next, note, tier, chain, earned } = reduce(state, action, context);
+    const { state: next, note, tier, chain, earned, to } = reduce(state, action, context);
     const quiet = (tier ?? (DIGEST_KINDS.has(action.kind) ? "digest" : "live")) === "digest";
-    const entry = { at: context.now().toISOString(), actor: context.actor, text: note ?? "", kind: action.kind, ...(quiet ? { quiet: true } : {}), ...(chain ? { chain } : {}), ...(earned ? { earned } : {}) };
+    const entry = { at: context.now().toISOString(), actor: context.actor, text: note ?? "", kind: action.kind, ...(quiet ? { quiet: true } : {}), ...(chain ? { chain } : {}), ...(earned ? { earned } : {}), ...(to ? { to } : {}) };
     const last = next.journal.at(-1);
     const repeated = note !== null && TWEAK_KINDS.has(action.kind) && last?.kind === action.kind && last.actor === context.actor && last.text === note
         && context.now().getTime() - Date.parse(last.at) < TWEAK_WINDOW_MS; // 在調色盤上一格一格試顏色：只留第一筆，不每點一下就記一筆、推一則
@@ -282,6 +284,31 @@ function reduce(state, action, context) {
         case "give": {
             if (context.actor === "game")
                 throw new Error("小屋自己不遞東西。");
+            if (action.to && action.to !== "atone" && action.to !== "tsunu") { // 遞給客人：從家裡的庫存拿一份到他手上
+                const guest = state.visitors?.[action.to];
+                if (!guest)
+                    throw new Error("屋裡沒有這位客人。");
+                if (guest.spot.room !== state.positions[context.actor].room)
+                    throw new Error(`${guest.name}不在這間房。`);
+                if (guest.holding)
+                    throw new Error(`${guest.name}手上已經拿著東西了。`);
+                const at = context.now().toISOString();
+                if (action.dish) {
+                    const dish = context.content.dishes[action.dish];
+                    if (!dish || (state.dishes[action.dish] ?? 0) < 1)
+                        throw new Error(`沒有${dish?.label ?? action.dish}可以遞。`);
+                    const item = { kind: "dish", dish: action.dish, text: dish.label, by: context.actor, at };
+                    return { state: { ...state, dishes: adjust(state.dishes, action.dish, -1), visitors: { ...state.visitors, [action.to]: { ...guest, holding: { item } } } }, note: `遞給${guest.name}一份${dish.label}`, to: action.to };
+                }
+                if (!action.product)
+                    throw new Error("要遞商品或家常菜。");
+                if ((state.products[action.product] ?? 0) < 1)
+                    throw new Error(`沒有${productLabel(action.product)}可以遞。`);
+                const item = { kind: "product", chain: action.product, by: context.actor, at };
+                return { state: { ...state, products: adjust(state.products, action.product, -1), visitors: { ...state.visitors, [action.to]: { ...guest, holding: { item } } } }, note: `遞給${guest.name}一份${productLabel(action.product)}`, to: action.to };
+            }
+            if (!action.product)
+                throw new Error("要遞什麼？");
             const to = context.actor === "atone" ? "tsunu" : "atone";
             if (to === "tsunu" && !state.tsunu.home)
                 throw new Error("阿宇不在家，先放在桌上吧。");
@@ -469,8 +496,9 @@ function reduce(state, action, context) {
                 throw new Error("小屋自己不關門。");
             if (!state.door?.open)
                 throw new Error("門本來就關著。");
-            const guests = Object.keys(state.visitors ?? {}).length;
-            return { state: { ...state, door: { open: false, by: context.actor, at: context.now().toISOString() }, visitors: {} }, note: guests ? "關上門，客人都回家了" : "關上門" };
+            const guests = Object.values(state.visitors ?? {});
+            const tidied = guests.reduce((next, guest) => returnHolding(next, guest, furniture), state); // 客人手上的東西放回桌上
+            return { state: { ...tidied, door: { open: false, by: context.actor, at: context.now().toISOString() }, visitors: {}, invitations: [] }, note: guests.length ? "關上門，客人都回家了" : "關上門" };
         }
         case "say_guests": {
             if (context.actor === "game")
@@ -584,32 +612,26 @@ function reduce(state, action, context) {
             if (context.actor === "game")
                 throw new Error("小屋自己不放東西。");
             const { piece } = findPlaced(state, action.id);
-            if (!furniture[piece.item]?.table)
-                throw new Error(`${label(piece.item)}上放不了東西。`);
-            const items = piece.items ?? [];
-            if (items.length >= TABLE_SLOTS)
-                throw new Error(`${label(piece.item)}上滿了，最多放 ${TABLE_SLOTS} 樣。`);
             const at = context.now().toISOString();
             if (action.product) {
                 if ((state.products[action.product] ?? 0) < 1)
                     throw new Error(`沒有${productLabel(action.product)}可以放。`);
                 const item = { kind: "product", chain: action.product, by: context.actor, at };
-                return { state: replacePlaced({ ...state, products: adjust(state.products, action.product, -1) }, { ...piece, items: [...items, item] }), note: `把一份${productLabel(action.product)}放在${label(piece.item)}上` };
+                return { state: putOnTable({ ...state, products: adjust(state.products, action.product, -1) }, furniture, action.id, item), note: `把一份${productLabel(action.product)}放在${label(piece.item)}上` };
             }
             if (action.dish) {
                 const dish = context.content.dishes[action.dish];
                 if (!dish || (state.dishes[action.dish] ?? 0) < 1)
                     throw new Error(`沒有${dish?.label ?? action.dish}可以放。`);
                 const item = { kind: "dish", dish: action.dish, text: dish.label, by: context.actor, at };
-                return { state: replacePlaced({ ...state, dishes: adjust(state.dishes, action.dish, -1) }, { ...piece, items: [...items, item] }), note: `把一份${dish.label}端到${label(piece.item)}上` };
+                return { state: putOnTable({ ...state, dishes: adjust(state.dishes, action.dish, -1) }, furniture, action.id, item), note: `把一份${dish.label}端到${label(piece.item)}上` };
             }
             const text = action.note?.trim() ?? "";
             if (!text)
                 throw new Error("要放商品或寫一張紙條。");
             if (text.length > NOTE_MAX_LENGTH)
                 throw new Error(`紙條最多 ${NOTE_MAX_LENGTH} 字。`);
-            const item = { kind: "note", text, by: context.actor, at };
-            return { state: replacePlaced(state, { ...piece, items: [...items, item] }), note: `在${label(piece.item)}上留了一張紙條：${text}` };
+            return { state: putOnTable(state, furniture, action.id, { kind: "note", text, by: context.actor, at }), note: `在${label(piece.item)}上留了一張紙條：${text}` };
         }
         case "take_from_table": {
             if (context.actor === "game")
@@ -668,6 +690,22 @@ function reduce(state, action, context) {
             if (!cell)
                 throw new Error("旁邊沒有位子讓對方站。");
             return { state: { ...state, positions: { ...state.positions, [target]: { room: spot.room, ...cell } } }, note: `叫${ACTOR_NAME[target]}過來` };
+        }
+        case "answer_invite": {
+            if (context.actor === "game")
+                throw new Error("小屋自己不回應邀請。");
+            return answerInvite(state, action.id, context.actor, action.accept, furniture, context.now());
+        }
+        case "expire_invites": {
+            if (context.actor !== "game")
+                throw new Error("邀請只有小屋自己會讓它過期。");
+            const now = context.now();
+            const expiring = (state.invitations ?? []).filter((invitation) => invitation.status === "pending" && inviteStale(invitation, now));
+            const invitations = (state.invitations ?? [])
+                .map((invitation) => (expiring.includes(invitation) ? { ...invitation, status: "expired", answeredAt: now.toISOString() } : invitation))
+                .filter((invitation) => !inviteStale(invitation, now));
+            const note = expiring.map((invitation) => `${personName(state, invitation.to)}現在不方便（${personName(state, invitation.from)}的邀請過期了）`).join("；");
+            return { state: { ...state, invitations }, note: note || null };
         }
         case "sleep": { // 自己躺在床上就睡；對方也在同一張床上就一起睡（對方先睡著了也算，躺過去一起睡）
             if (context.actor === "game")
@@ -1045,6 +1083,96 @@ export function sleepLength(since, now) {
     const hours = (now.getTime() - new Date(since).getTime()) / 3_600_000;
     return hours < 1 ? `${Math.max(1, Math.round(hours * 60))} 分鐘` : `${hours.toFixed(1)} 小時`;
 }
+/** 桌上第 index 樣東西，與拿走它之後剩下的。 */
+export function tableItemAt(state, id, index) {
+    const { piece } = findPlaced(state, id);
+    const items = piece.items ?? [];
+    const item = items[index];
+    if (!item)
+        throw new Error("桌上沒有這樣東西。");
+    return { piece, item, rest: items.filter((_, i) => i !== index) };
+}
+/** 把桌面換成 items。 */
+export function setTableItems(state, piece, items) {
+    return replacePlaced(state, { ...piece, items: [...items] });
+}
+/** 把一樣東西放到桌上：要是能放東西的家具、還有空位。 */
+export function putOnTable(state, catalog, id, item) {
+    const { piece } = findPlaced(state, id);
+    if (!catalog[piece.item]?.table)
+        throw new Error(`${furnitureLabel(catalog, piece.item)}上放不了東西。`);
+    const items = piece.items ?? [];
+    if (items.length >= TABLE_SLOTS)
+        throw new Error(`${furnitureLabel(catalog, piece.item)}上滿了，最多放 ${TABLE_SLOTS} 樣。`);
+    return setTableItems(state, piece, [...items, item]);
+}
+/** 訪客手上的東西收回去（離開、關門時）：桌上拿的放回原本的桌子（桌子收掉了或滿了就算吃掉了），屋主遞的回到家裡的庫存。 */
+export function returnHolding(state, visitor, catalog) {
+    if (!visitor.holding)
+        return state;
+    const { item, from } = visitor.holding;
+    if (!from)
+        return item.kind === "dish" ? { ...state, dishes: adjust(state.dishes, item.dish, 1) } : { ...state, products: adjust(state.products, item.chain, 1) };
+    try {
+        return putOnTable(state, catalog, from, item);
+    }
+    catch {
+        return state;
+    }
+}
+/** 桌上食物的叫法：「阿童煮的蛋餅」「一份布丁」。 */
+export function foodName(item, content) {
+    if (item.kind === "dish")
+        return `${ACTOR_NAME[item.by]}煮的${item.text ?? content.dishes[item.dish]?.label ?? item.dish}`;
+    return `一份${content.recipes[item.chain]?.tiers.at(-1) ?? item.chain}`;
+}
+/** 阿童吃了這樣東西回幾點體力：家常菜照菜單，商品 1 點。 */
+export function foodStamina(item, content) {
+    return item.kind === "dish" ? content.dishes[item.dish]?.stamina ?? 1 : 1;
+}
+/** 阿童吃了東西：體力回 amount 點（不超過上限）。 */
+export function eatenStamina(state, amount, settings, now) {
+    const { max } = settings.stamina;
+    const value = Math.min(max, currentStamina(state, settings, now) + amount);
+    return { value, updatedAt: value >= max ? now.toISOString() : state.stamina.updatedAt };
+}
+/** 屋裡的人怎麼稱呼：阿童、阿宇或客人的名字。 */
+export function personName(state, id) {
+    return id === "atone" || id === "tsunu" ? ACTOR_NAME[id] : state.visitors?.[id]?.name ?? "客人";
+}
+/** 回應給 who 的邀請：答應就走到邀請的人旁邊最近的空位（換房間也一樣，睡著的先醒），婉拒就記下來讓邀請的人知道。
+ *  note 不含回應者的主詞。 */
+export function answerInvite(state, id, who, accept, catalog, now) {
+    const invitation = state.invitations?.find((candidate) => candidate.id === id && candidate.status === "pending");
+    if (!invitation)
+        throw new Error("這則邀請已經不在了。");
+    if (invitation.to !== who)
+        throw new Error("這則邀請不是給你的。");
+    const inviter = state.visitors?.[invitation.from];
+    if (!inviter)
+        throw new Error("邀請你的客人已經回家了。");
+    const answered = { ...state, invitations: state.invitations.map((candidate) => (candidate.id === id ? { ...candidate, status: accept ? "accepted" : "declined", answeredAt: now.toISOString() } : candidate)) };
+    if (!accept)
+        return { state: answered, note: `現在不方便（${inviter.name}的邀請）` };
+    const [spot] = freeCellsNear(state, inviter.spot.room, inviter.spot, catalog, peopleSpots(state, who));
+    if (!spot)
+        throw new Error(`${inviter.name}旁邊沒有位子了。`);
+    const host = who === "atone" || who === "tsunu" ? who : null;
+    const fromRoom = host ? state.positions[host].room : state.visitors?.[who]?.spot.room;
+    const where = fromRoom === spot.room ? `${inviter.name}旁邊` : findRoom(state, spot.room).name;
+    const note = `答應${inviter.name}的邀請，走到${where}`;
+    if (host)
+        return { state: { ...answered, positions: { ...answered.positions, [host]: spot }, sleeping: answered.sleeping?.alone === host ? null : answered.sleeping }, note };
+    const { asleep: _asleep, ...guest } = state.visitors[who];
+    return { state: { ...answered, visitors: { ...answered.visitors, [who]: { ...guest, spot } } }, note };
+}
+/** 有沒有邀請該過期（沒回應超過 INVITE_MS）或該清掉（回應過超過 INVITE_RESULT_MS）：小屋時鐘用它決定要不要套用 expire_invites。 */
+export function inviteHousekeepingDue(state, now) {
+    return (state.invitations ?? []).some((invitation) => inviteStale(invitation, now));
+}
+const inviteStale = (invitation, now) => invitation.status === "pending"
+    ? now.getTime() - Date.parse(invitation.at) >= INVITE_MS
+    : now.getTime() - Date.parse(invitation.answeredAt ?? invitation.at) >= INVITE_RESULT_MS;
 /** 這件家具在哪間房。 */
 export function placedRoom(state, id) {
     return findPlaced(state, id).roomId;
@@ -1180,9 +1308,7 @@ function pieceNextTo(room, cell, catalog, wanted) {
 }
 /** 阿童吃了東西：體力回 amount 點（不超過上限）。 */
 function fedStamina(state, amount, context) {
-    const { max } = context.content.settings.stamina;
-    const value = Math.min(max, currentStamina(state, context.content.settings, context.now()) + amount);
-    return { value, updatedAt: value >= max ? context.now().toISOString() : state.stamina.updatedAt };
+    return eatenStamina(state, amount, context.content.settings, context.now());
 }
 /** 兩人一起刷牙時給另一個人站的空位：先找 from 旁邊、跟洗手台平行的那兩格（並肩對著鏡子），都站不進去才找洗手台旁邊其他格；有人站（taken）的跳過；沒有就 null。 */
 function freeSpotBeside(room, basin, from, catalog, taken) {
@@ -1228,7 +1354,7 @@ function openedShop(state, kind) {
 }
 const withShop = (state, kind, shop) => ({ ...state, shops: { ...state.shops, [kind]: shop } });
 /** 家具 id 全家唯一：找得到就知道它在哪間房。 */
-function findPlaced(state, id) {
+export function findPlaced(state, id) {
     for (const [roomId, room] of Object.entries(state.rooms)) {
         const piece = room.placed.find((p) => p.id === id);
         if (piece)

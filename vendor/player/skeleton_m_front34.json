@@ -527,6 +527,14 @@
    "head": [
     "m_front34_kid_tsunu_glasses.png"
    ]
+  },
+  "kid_shorthl_hair": {
+   "head": [
+    "m_front34_kid_shorthl_hair.png"
+   ],
+   "head:behind": [
+    "m_front34_kid_shorthl_hair_back.png"
+   ]
   }
  },
  "scale": 1.05,

@@ -2,6 +2,7 @@
 // 衣服不在這裡選：新娃娃穿基本款，之後在衣櫃換。
 
 import { BODIES, FACES, GLASSES, HAIRS, MOUTHS, HAIR_COLORS, IRIS_COLORS, LIP_COLORS, SKIN_TONES, available, headParts } from "../vendor/rules/looks.js";
+import { swatchRow } from "../vendor/web/swatches.js";
 import { createDoll } from "./dolls.js";
 
 const VIEW_LABELS = { front: "正面", front34: "斜前", back34: "斜後" };
@@ -21,12 +22,6 @@ export function setupCreator({ skeletons, animations, samplePose, clothes, dress
   }
 
   const chip = (label, on, onclick) => Object.assign(document.createElement("button"), { className: "item" + (on ? " on" : ""), textContent: label, onclick });
-  const swatch = (color, on, disabled, onclick) => {
-    const button = Object.assign(document.createElement("button"), { title: color, onclick, disabled });
-    button.style.background = color;
-    if (on) button.classList.add("on");
-    return button;
-  };
   const group = (title, ...children) => {
     const box = document.createElement("div");
     box.className = "option-group";
@@ -45,19 +40,22 @@ export function setupCreator({ skeletons, animations, samplePose, clothes, dress
     const face = FACES.find((f) => f.id === draft.face);
     const mouthId = draft.mouth ?? draft.face;
     const mouth = MOUTHS.find((m) => m.id === mouthId);
+    const hairOption = HAIRS.find((h) => h.id === draft.hair);
+    const highlightable = Boolean(hairOption?.highlight && outfitsOf(draft.body)[hairOption.highlight]);   // 這款髮型有畫挑染位置
     const name = Object.assign(document.createElement("input"), { id: "dollName", value: draft.name, maxLength: 12, placeholder: "取個名字" });
     name.oninput = () => { draft.name = name.value; };
     $("creatorOptions").replaceChildren(
       group("名字", name),
       group("看哪一面", row("chips", Object.entries(VIEW_LABELS).map(([id, label]) => chip(label, view === id, () => { view = id; render(); })))),
       group("身體", row("chips", Object.entries(BODIES).map(([id, body]) => chip(body.label, draft.body === id, () => set(fitToBody({ ...draft, body: id })))))),
-      group("膚色", row("swatches", SKIN_TONES.map((c) => swatch(c, draft.skin === c, false, () => set({ skin: c }))))),
+      group("膚色", swatchRow(SKIN_TONES, draft.skin, (skin) => set({ skin }))),
       group("髮型", row("chips", options(HAIRS, draft.body).map((h) => chip(h.label, draft.hair === h.id, () => set({ hair: h.id }))))),
-      group("髮色", row("swatches", HAIR_COLORS.map((c) => swatch(c, draft.hairColor === c, false, () => set({ hairColor: c }))))),
+      group("髮色", swatchRow(HAIR_COLORS, draft.hairColor, (hairColor) => set({ hairColor }))),
+      group(highlightable ? "挑染" : "挑染（這款沒有挑染）", row("chips", [chip("不挑染", !draft.hairHighlight, () => set({ hairHighlight: null }))]), swatchRow(HAIR_COLORS, draft.hairHighlight ?? null, (hairHighlight) => set({ hairHighlight }), !highlightable)),
       group("眼睛", row("chips", options(FACES, draft.body).map((f) => chip(f.label, draft.face === f.id, () => set({ face: f.id, mouth: mouthId }))))),
-      group(face?.iris ? "眼睛顏色" : "眼睛顏色（這款維持原本的顏色）", row("swatches", IRIS_COLORS.map((c) => swatch(c, draft.irisColor === c, !face?.iris, () => set({ irisColor: c }))))),
+      group(face?.iris ? "眼睛顏色" : "眼睛顏色（這款維持原本的顏色）", swatchRow(IRIS_COLORS, draft.irisColor, (irisColor) => set({ irisColor }), !face?.iris)),
       group("嘴巴", row("chips", options(MOUTHS, draft.body).map((m) => chip(m.label, mouthId === m.id, () => set({ mouth: m.id }))))),
-      group(mouth?.lips ? "口紅" : "口紅（這款維持原本的唇色）", row("swatches", LIP_COLORS.map((c) => swatch(c, (draft.lipColor ?? LIP_COLORS[0]) === c, !mouth?.lips, () => set({ lipColor: c }))))),
+      group(mouth?.lips ? "口紅" : "口紅（這款維持原本的唇色）", swatchRow(LIP_COLORS, draft.lipColor ?? LIP_COLORS[0], (lipColor) => set({ lipColor }), !mouth?.lips)),
       group("眼鏡", row("chips", [chip("不戴", !draft.glasses, () => set({ glasses: null })), ...options(GLASSES, draft.body).map((g) => chip(g.label, draft.glasses === g.id, () => set({ glasses: g.id })))])),
     );
   }

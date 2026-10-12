@@ -27,6 +27,14 @@
 338,
 34
 ],
+"front34_kid_bunwaves_hair.png": [
+342,
+79
+],
+"front34_kid_bunwaves_hair_back.png": [
+322,
+52
+],
 "front34_kid_f_atone_brows.png": [
 356,
 229
@@ -127,6 +135,22 @@
 381,
 326
 ],
+"front34_kid_fluffylong_hair.png": [
+342,
+79
+],
+"front34_kid_fluffylong_hair_back.png": [
+296,
+52
+],
+"front34_kid_himecut_hair.png": [
+342,
+79
+],
+"front34_kid_himecut_hair_back.png": [
+338,
+76
+],
 "front34_kid_long_hair.png": [
 342,
 79
@@ -134,6 +158,38 @@
 "front34_kid_long_hair_back.png": [
 338,
 72
+],
+"front34_kid_longhl_hair.png": [
+342,
+90
+],
+"front34_kid_longhl_hair_back.png": [
+338,
+83
+],
+"front34_kid_longstraight_hair.png": [
+342,
+79
+],
+"front34_kid_longstraight_hair_back.png": [
+339,
+77
+],
+"front34_kid_longstraighthl_hair.png": [
+342,
+80
+],
+"front34_kid_longstraighthl_hair_back.png": [
+339,
+78
+],
+"front34_kid_lowponytail_hair.png": [
+342,
+79
+],
+"front34_kid_lowponytail_hair_back.png": [
+328,
+30
 ],
 "front34_kid_pixie_hair.png": [
 342,
@@ -151,6 +207,14 @@
 318,
 15
 ],
+"front34_kid_ponytailhl_hair.png": [
+342,
+79
+],
+"front34_kid_ponytailhl_hair_back.png": [
+328,
+15
+],
 "front34_kid_straightbob_hair.png": [
 342,
 79
@@ -158,6 +222,14 @@
 "front34_kid_straightbob_hair_back.png": [
 335,
 65
+],
+"front34_kid_straightbobhl_hair.png": [
+346,
+79
+],
+"front34_kid_straightbobhl_hair_back.png": [
+338,
+74
 ],
 "front34_kid_twinbuns_hair.png": [
 343,
@@ -387,6 +459,14 @@
 386,
 17
 ],
+"front_kid_bunwaves_hair.png": [
+377,
+90
+],
+"front_kid_bunwaves_hair_back.png": [
+281,
+42
+],
 "front_kid_f_atone_brows.png": [
 426,
 223
@@ -487,6 +567,22 @@
 489,
 327
 ],
+"front_kid_fluffylong_hair.png": [
+377,
+90
+],
+"front_kid_fluffylong_hair_back.png": [
+294,
+52
+],
+"front_kid_himecut_hair.png": [
+377,
+90
+],
+"front_kid_himecut_hair_back.png": [
+314,
+75
+],
 "front_kid_long_hair.png": [
 377,
 90
@@ -494,6 +590,38 @@
 "front_kid_long_hair_back.png": [
 339,
 59
+],
+"front_kid_longhl_hair.png": [
+377,
+90
+],
+"front_kid_longhl_hair_back.png": [
+340,
+78
+],
+"front_kid_longstraight_hair.png": [
+377,
+90
+],
+"front_kid_longstraight_hair_back.png": [
+315,
+64
+],
+"front_kid_longstraighthl_hair.png": [
+377,
+101
+],
+"front_kid_longstraighthl_hair_back.png": [
+336,
+64
+],
+"front_kid_lowponytail_hair.png": [
+380,
+90
+],
+"front_kid_lowponytail_hair_back.png": [
+365,
+24
 ],
 "front_kid_pixie_hair.png": [
 382,
@@ -511,6 +639,14 @@
 358,
 15
 ],
+"front_kid_ponytailhl_hair.png": [
+386,
+100
+],
+"front_kid_ponytailhl_hair_back.png": [
+386,
+23
+],
 "front_kid_straightbob_hair.png": [
 377,
 90
@@ -518,6 +654,14 @@
 "front_kid_straightbob_hair_back.png": [
 350,
 50
+],
+"front_kid_straightbobhl_hair.png": [
+377,
+92
+],
+"front_kid_straightbobhl_hair_back.png": [
+350,
+64
 ],
 "front_kid_twinbuns_hair.png": [
 385,
@@ -715,9 +859,37 @@
 341,
 20
 ],
+"kid_bunwaves_hair.png": [
+338,
+38
+],
+"kid_fluffylong_hair.png": [
+342,
+67
+],
+"kid_himecut_hair.png": [
+339,
+66
+],
 "kid_long_hair.png": [
 342,
 73
+],
+"kid_longhl_hair.png": [
+339,
+75
+],
+"kid_longstraight_hair.png": [
+331,
+71
+],
+"kid_longstraighthl_hair.png": [
+350,
+72
+],
+"kid_lowponytail_hair.png": [
+328,
+7
 ],
 "kid_pixie_hair.png": [
 327,
@@ -727,9 +899,17 @@
 336,
 4
 ],
+"kid_ponytailhl_hair.png": [
+340,
+4
+],
 "kid_straightbob_hair.png": [
 339,
 66
+],
+"kid_straightbobhl_hair.png": [
+364,
+68
 ],
 "kid_twinbuns_hair.png": [
 342,
@@ -754,6 +934,10 @@
 "m_back34_kid_short_hair.png": [
 372,
 54
+],
+"m_back34_kid_shorthl_hair.png": [
+400,
+74
 ],
 "m_back34_kid_sidepart_hair.png": [
 367,
@@ -1118,6 +1302,14 @@
 "m_front34_kid_short_hair_back.png": [
 375,
 64
+],
+"m_front34_kid_shorthl_hair.png": [
+383,
+86
+],
+"m_front34_kid_shorthl_hair_back.png": [
+373,
+81
 ],
 "m_front34_kid_sidepart_hair.png": [
 383,
@@ -1518,6 +1710,14 @@
 "m_front_kid_short_hair_back.png": [
 375,
 48
+],
+"m_front_kid_shorthl_hair.png": [
+411,
+86
+],
+"m_front_kid_shorthl_hair_back.png": [
+398,
+65
 ],
 "m_front_kid_sidepart_hair.png": [
 398,

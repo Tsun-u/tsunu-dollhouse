@@ -218,6 +218,14 @@ button:disabled { background: var(--line); color: var(--muted); cursor: default;
 .swatches button { width: 32px; height: 32px; padding: 0; border-radius: 50%; border: 2px solid var(--line); }
 .swatches button.on { border-color: var(--ink); box-shadow: 0 0 0 2px var(--panel) inset; }
 .swatches button:disabled { opacity: 0.3; }
+.swatches .custom-color { width: 32px; height: 32px; padding: 0; border-radius: 50%; border: 2px solid var(--line); background: conic-gradient(#f66, #fd5, #6d6, #5cf, #a7f, #f6a, #f66); cursor: pointer; }   /* 自訂顏色：還沒自訂時是彩虹圈，自訂了就顯示那個顏色 */
+.swatches .custom-color:not(.on)::-webkit-color-swatch { opacity: 0; }
+.swatches .custom-color:not(.on)::-moz-color-swatch { opacity: 0; }
+.swatches .custom-color::-webkit-color-swatch-wrapper { padding: 2px; }
+.swatches .custom-color::-webkit-color-swatch { border: none; border-radius: 50%; }
+.swatches .custom-color::-moz-color-swatch { border: none; border-radius: 50%; }
+.swatches .custom-color.on { border-color: var(--ink); }
+.swatches .custom-color:disabled { opacity: 0.3; cursor: default; }
 .wardrobe-colors { flex-basis: 100%; }
 /* 衣櫃試穿：草稿跟身上穿的不一樣時出現存檔／放棄 */
 .closet-save { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; padding: 8px 10px; border-radius: 10px; background: var(--panel); border: 1px dashed var(--accent); font-size: 14px; color: var(--muted); }

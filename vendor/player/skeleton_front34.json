@@ -495,6 +495,78 @@
    "head": [
     "front34_kid_atone_glasses.png"
    ]
+  },
+  "kid_himecut_hair": {
+   "head": [
+    "front34_kid_himecut_hair.png"
+   ],
+   "head:behind": [
+    "front34_kid_himecut_hair_back.png"
+   ]
+  },
+  "kid_longstraight_hair": {
+   "head": [
+    "front34_kid_longstraight_hair.png"
+   ],
+   "head:behind": [
+    "front34_kid_longstraight_hair_back.png"
+   ]
+  },
+  "kid_fluffylong_hair": {
+   "head": [
+    "front34_kid_fluffylong_hair.png"
+   ],
+   "head:behind": [
+    "front34_kid_fluffylong_hair_back.png"
+   ]
+  },
+  "kid_bunwaves_hair": {
+   "head": [
+    "front34_kid_bunwaves_hair.png"
+   ],
+   "head:behind": [
+    "front34_kid_bunwaves_hair_back.png"
+   ]
+  },
+  "kid_lowponytail_hair": {
+   "head": [
+    "front34_kid_lowponytail_hair.png"
+   ],
+   "head:behind": [
+    "front34_kid_lowponytail_hair_back.png"
+   ]
+  },
+  "kid_longhl_hair": {
+   "head": [
+    "front34_kid_longhl_hair.png"
+   ],
+   "head:behind": [
+    "front34_kid_longhl_hair_back.png"
+   ]
+  },
+  "kid_longstraighthl_hair": {
+   "head": [
+    "front34_kid_longstraighthl_hair.png"
+   ],
+   "head:behind": [
+    "front34_kid_longstraighthl_hair_back.png"
+   ]
+  },
+  "kid_straightbobhl_hair": {
+   "head": [
+    "front34_kid_straightbobhl_hair.png"
+   ],
+   "head:behind": [
+    "front34_kid_straightbobhl_hair_back.png"
+   ]
+  },
+  "kid_ponytailhl_hair": {
+   "head": [
+    "front34_kid_ponytailhl_hair.png"
+   ],
+   "head:behind": [
+    "front34_kid_ponytailhl_hair_back.png"
+   ]
   }
  },
  "skinGray": true,
