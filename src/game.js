@@ -1,5 +1,6 @@
 // 遊戲存檔：錢、材料、商品、家具、房間、三消、工坊、咖啡廳。規則全部交給小屋匯出的 vendor/rules，這裡只負責存讀與通知。
-// 動作一律用 actor "atone" 送：小屋存檔裡的「阿童」在兒童版就是玩家；哪個娃娃做的、站在哪，用 doer 告訴規則。
+// 玩家的動作用 actor "atone" 送：小屋存檔裡的「阿童」在兒童版就是玩家；哪個娃娃做的、站在哪，用 doer 告訴規則。
+// 咖啡廳時鐘排的動作（客人上門、等太久離開、自動出餐）用 actor "game"，跟小屋的時鐘一樣是店裡自己發生的事。
 
 import { restore } from "../vendor/rules/restore.js";
 import { applyAction } from "../vendor/rules/state.js";
@@ -30,21 +31,26 @@ export function createGame(content, storage, clock = () => new Date()) {
     newId: () => crypto.randomUUID(),
     seed: () => Math.floor(Math.random() * 2 ** 31),
   };
+  const commit = (next) => {
+    state = next;
+    storage.setItem(GAME_KEY, JSON.stringify(state));
+    for (const listener of listeners) listener(state);
+    return state;
+  };
   return {
     get state() { return state; },
     get content() { return content; },
     /** 套用一個動作；不合法會丟錯，狀態與存檔都不變。doer（{ name, spot }）是做這件事的娃娃：日誌記她的名字，洗手、做菜看她站哪。 */
     apply(action, doer) {
-      state = applyAction(state, action, doer ? { ...context, doer } : context);
-      storage.setItem(GAME_KEY, JSON.stringify(state));
-      for (const listener of listeners) listener(state);
-      return state;
+      return commit(applyAction(state, action, doer ? { ...context, doer } : context));
+    },
+    /** 店裡自己發生的事（咖啡廳時鐘排的動作）；不合法一樣丟錯。 */
+    applyAsHouse(action) {
+      return commit(applyAction(state, action, { ...context, actor: "game" }));
     },
     /** 整份換掉（匯入存檔用）：先照目前規則升級舊格式。 */
     replace(snapshot) {
-      state = forDolls(restore(snapshot, content));
-      storage.setItem(GAME_KEY, JSON.stringify(state));
-      for (const listener of listeners) listener(state);
+      commit(forDolls(restore(snapshot, content)));
     },
     subscribe(listener) {
       listeners.add(listener);

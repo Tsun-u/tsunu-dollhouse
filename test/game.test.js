@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
+import { cafeTick } from "../src/cafe-clock.js";
 import { GAME_KEY, contentFrom, createGame } from "../src/game.js";
 
 const read = (name) => JSON.parse(readFileSync(new URL(`../vendor/content/${name}.json`, import.meta.url), "utf8"));
@@ -49,6 +50,14 @@ test("遊戲存檔裡阿童、阿宇的穿著是空的（娃娃穿什麼記在�
   const before = game.state.money;
   game.apply({ kind: "sell_clothes", item });
   assert.ok(game.state.money > before);
+});
+
+test("咖啡廳的時鐘帶客人上門（用店裡自己的身分套用）；玩家自己帶不了客人", () => {
+  const game = createGame(content, memoryStorage());
+  cafeTick(game, new Date(), () => 0, () => "c1");
+  const [customer] = game.state.shops.cafe.customers;
+  assert.equal(customer?.id, "c1");
+  assert.throws(() => game.apply({ kind: "customer_arrive", id: "c2", wants: customer.wants, look: 0 }), /客人只會自己上門/);
 });
 
 test("訂閱者在每次成功的動作後收到新狀態", () => {

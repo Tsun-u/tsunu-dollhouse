@@ -95,7 +95,7 @@ const puzzle = new PuzzleView($("board"), $("puzzleInfo"), $("puzzleStart"), ico
 const workshop = new WorkshopView({ materials: $("materials"), grid: $("grid"), products: $("products") }, content.recipes, icons, apply);
 const guests = Object.entries(BODIES).map(([body, spec]) => ({ body, views: { front: skeletons[spec.views.front], front34: skeletons[spec.views.front34], back34: skeletons[spec.views.back34] } }));
 const cafe = new CafeView($("cafeCanvas"), { skeleton: skeletons.front, guests, looks: { BODIES, CLOTHES_COLORS, headParts, randomLooks }, clothes: content.clothes, dress: { dressUp, dyeable, CATEGORY_SLOT }, animations, samplePose }, icons, apply);
-startCafeClock(game, apply);
+startCafeClock(game);
 
 // ───────── 商店街：咖啡廳加上租來的雜貨店、服飾店（跟小屋一樣），每家店可以換裝潢 ─────────
 
