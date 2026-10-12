@@ -5,13 +5,13 @@ const WALK_CELLS_PER_S = 2.2;   // 跟 room-view 的走路速度一樣：估走�
 export const WAVE_MS = 3200, BRUSH_MS = 8000, WASH_MS = 4000, BUBBLE_MS = 8000;
 
 export function createGestures(room, pets) {
-  const timers = {};
+  const timers = new WeakMap();   // 人物 → 計時；用人物本身當鍵（兒童版同一個素體的娃娃名字一樣）
 
   /** 播一段動作，時間到回 idle；同一個人的新動作蓋掉舊的計時。 */
   function animate(who, anim, ms) {
     who.anim = anim;
-    clearTimeout(timers[who.name]);
-    timers[who.name] = setTimeout(() => { if (who.anim === anim) who.anim = "idle"; }, ms);
+    clearTimeout(timers.get(who));
+    timers.set(who, setTimeout(() => { if (who.anim === anim) who.anim = "idle"; }, ms));
   }
 
   /** 走到定位、站定之後面向 toward（兩人一起刷牙時並肩面向同一面鏡子），播刷牙或洗手。 */

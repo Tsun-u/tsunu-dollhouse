@@ -3,6 +3,7 @@
 
 import { BODIES, headParts } from "../vendor/rules/looks.js";
 import { cuddleSpot, openCells, pillowSpot, seatAt } from "../vendor/rules/state.js";
+import { createGestures } from "../vendor/web/gestures.js";
 import { Pets } from "../vendor/web/pets.js";
 import { RoomView } from "../vendor/web/room-view.js";
 
@@ -12,7 +13,7 @@ const button = (label, onclick, className = "item") => Object.assign(document.cr
 
 export class House {
   /**
-   * @param deps { game, content, skeletons, animations, samplePose, dressUp, dolls: () => dollsSave, updateDoll(id, changes), select(id), apply(action) }
+   * @param deps { game, content, skeletons, animations, samplePose, dressUp, dolls: () => dollsSave, updateDoll(id, changes), select(id), apply(action, doer) → 新寫的日誌或 null }
    */
   constructor(deps) {
     this.deps = deps;
@@ -33,6 +34,7 @@ export class House {
       bathFacesFront: () => false,   // 泡澡一律背影、一個人泡
     });
     this.room.pets = new Pets(content.pets, this.room);
+    this.play = createGestures(this.room, content.pets);   // 把日誌那句演出來：刷牙洗手、狗跳、吃飯、撿球、翻書的泡泡
     $("flipBtn").onclick = () => this.selectedPiece && deps.apply({ kind: "flip", id: this.selectedPiece });
     $("storeBtn").onclick = () => { if (this.selectedPiece) { deps.apply({ kind: "store", id: this.selectedPiece }); this.selectPiece(null); } };
     $("dogClose").onclick = () => { this.dogOpen = null; this.renderDog(); };
@@ -55,6 +57,8 @@ export class House {
     }
     const body = BODIES[doll.body];
     who.name = body.sprites;   // 衣服專屬圖用哪一組（女生 atone、男生 tsunu）
+    who.label = doll.name;     // 頭上泡泡寫誰說的
+    who.asleep = !!doll.asleep;
     who.skeletons = { front: skeletons[body.views.front], front34: skeletons[body.views.front34], back34: skeletons[body.views.back34] };
     who.headParts = headParts(doll);
     who.skin = doll.skin;
@@ -84,6 +88,7 @@ export class House {
     if (changedRoom && this.selectedDoll) this.room.pets?.follow(this.selectedDoll.spot, this.personFor(this.selectedDoll));
     this.room.setCharacters(present);
     this.room.sleeping = !!this.sleepingOn;
+    if (this.room.pets) this.room.pets.fed = game.state.fed ?? {};
     this.renderRoomTabs();
     this.renderInventory();
     this.renderPieceActions();
@@ -91,10 +96,28 @@ export class House {
     this.renderDog();
   }
 
-  /** 娃娃換位置：寫進娃娃存檔；有人起來就不算一起睡了。 */
+  /** 娃娃換位置：寫進娃娃存檔；走動就醒了，有人起來也不算一起睡了。 */
   moveDoll(id, spot) {
     this.sleepingOn = null;
-    this.deps.updateDoll(id, { spot });
+    this.deps.updateDoll(id, { spot, asleep: false });
+  }
+
+  /** 選取的娃娃做一件要進規則的事：帶上她是誰、站在哪；成功就把日誌那句演出來。 */
+  act(action) {
+    const doll = this.selectedDoll;
+    if (!doll) return;
+    const entry = this.deps.apply(action, { name: doll.name, spot: doll.spot });
+    if (!entry) return;
+    const watchers = [...this.people.values()].filter((who) => who.room === this.roomId);   // 小黑撿完球跑回他們身邊
+    this.play(this.personFor(doll), entry.text, { spot: doll.spot, watchers });
+  }
+
+  /** 這件家具上離點的地方最近、這個娃娃坐得下的位置（床照枕頭那一排）；坐不下就 null。 */
+  seatFor(piece, doll) {
+    const from = this.tappedCell ?? piece;
+    const cells = this.room.cellsOf(piece).map((key) => key.split(",").map(Number)).map(([x, y]) => ({ x, y }))
+      .sort((a, b) => Math.hypot(a.x - from.x, a.y - from.y) - Math.hypot(b.x - from.x, b.y - from.y));
+    return cells.map((cell) => this.standingSpot(cell, doll.id)).find((cell) => this.standable(cell, doll.id)) ?? null;
   }
 
   /** 能不能站：房間裡的空格或座位，而且沒有別的娃娃站在那裡；浴缸一次只泡一個人。 */
@@ -192,20 +215,32 @@ export class House {
     this.renderPieceActions();
   }
 
-  /** 家具點起來之後能做的事：坐下、開燈、澆水；轉向與收回倉庫一直在旁邊。 */
+  /** 家具點起來之後能做的事：坐下、躺下睡覺、開燈、翻書、澆水、餵狗；轉向與收回倉庫一直在旁邊。 */
   renderPieceActions() {
     const piece = this.selectedPiece && this.room.home?.placed.find((p) => p.id === this.selectedPiece);
     const spec = piece && this.deps.content.furniture[piece.item];
     const actions = [];
     const doll = this.selectedDoll;
+    const catalog = this.deps.content.furniture;
+    const onThis = doll && seatAt(this.room.home, doll.spot, catalog)?.id === piece?.id;
     if (spec?.seat && doll) {
-      const cells = this.room.cellsOf(piece).map((key) => key.split(",").map(Number)).map(([x, y]) => ({ x, y }));
-      const near = cells.sort((a, b) => Math.hypot(a.x - (this.tappedCell ?? piece).x, a.y - (this.tappedCell ?? piece).y) - Math.hypot(b.x - (this.tappedCell ?? piece).x, b.y - (this.tappedCell ?? piece).y));
-      const seat = near.map((cell) => this.standingSpot(cell, doll.id)).find((cell) => this.standable(cell, doll.id));
-      if (seat) actions.push(button(`${doll.name}坐下`, () => this.moveDoll(doll.id, { room: this.roomId, x: seat.x, y: seat.y }), ""));
+      const seat = this.seatFor(piece, doll);
+      if (seat && !onThis) actions.push(button(`${doll.name}坐下`, () => this.moveDoll(doll.id, { room: this.roomId, x: seat.x, y: seat.y }), ""));
     }
-    if (spec?.switch) actions.push(button(piece.on ? "關燈" : "開燈", () => this.deps.apply({ kind: "toggle", id: piece.id }), ""));
-    if (spec?.plant) actions.push(button("澆水", () => this.deps.apply({ kind: "water", id: piece.id }), ""));
+    if (spec?.seatPose === "lounge" && doll) {   // 床：一個人躺下睡覺，睡著了就是起床
+      if (onThis && doll.asleep) actions.push(button(`${doll.name}起床`, () => this.deps.updateDoll(doll.id, { asleep: false }), ""));
+      else {
+        const seat = onThis ? doll.spot : this.seatFor(piece, doll);
+        if (seat) actions.push(button(`${doll.name}躺下睡覺`, () => this.deps.updateDoll(doll.id, { spot: { room: this.roomId, x: seat.x, y: seat.y }, asleep: true }), ""));
+      }
+    }
+    if (spec?.switch) actions.push(button(piece.on ? "關燈" : "開燈", () => this.act({ kind: "toggle", id: piece.id }), ""));
+    if (spec?.readable && this.deps.content.fortunes.length) actions.push(button("翻書", () => this.act({ kind: "read", id: piece.id }), ""));
+    if (spec?.plant) actions.push(button("澆水", () => this.act({ kind: "water", id: piece.id }), ""));
+    for (const [dog, pet] of Object.entries(this.deps.content.pets)) {
+      if (spec?.bowl) actions.push(button(`倒飼料給${pet.label}`, () => this.act({ kind: "feed", dog, food: "meal" }), ""));
+      if (spec?.snacks) actions.push(button(`拿零食給${pet.label}`, () => this.act({ kind: "feed", dog, food: "snack" }), ""));
+    }
     $("pieceActions").replaceChildren(...actions);
   }
 
@@ -259,20 +294,21 @@ export class House {
     if (spot) this.moveDoll(doll.id, { room: this.roomId, x: spot.x, y: spot.y });
   }
 
-  /** 狗：摸摸、丟球，只有畫面上的演出，不進存檔。 */
+  /** 跟狗能做的事（跟小屋一樣）：摸摸、餵飯、給零食（家裡有零食櫃）、這隻狗專屬的互動；小黑會撿球。 */
   renderDog() {
     $("dogPanel").hidden = !this.dogOpen;
     if (!this.dogOpen) return;
-    const pets = this.deps.content.pets;
-    $("dogTitle").textContent = `跟${pets[this.dogOpen]?.label ?? this.dogOpen}`;
-    const actions = [button("摸摸", () => this.room.pets?.cheer(this.dogOpen))];
-    if (this.dogOpen === "black") {
-      actions.push(button("丟球", () => {
-        const spots = openCells(this.room.home, this.deps.content.furniture);
-        const cell = spots[Math.floor(Math.random() * spots.length)];
-        if (cell) this.room.pets?.fetch("black", cell, [...this.people.values()].filter((who) => who.room === this.roomId));
-      }));
-    }
-    $("dogActions").replaceChildren(...actions);
+    const { pets, furniture } = this.deps.content;
+    const dog = this.dogOpen;
+    const hungry = this.room.pets?.isHungry({ id: dog });
+    $("dogTitle").textContent = `跟${pets[dog]?.label ?? dog}${hungry ? "（肚子餓了）" : ""}`;
+    const hasSnacks = Object.values(this.deps.game.state.rooms).some((home) => home.placed.some((piece) => furniture[piece.item]?.snacks));
+    $("dogActions").replaceChildren(
+      button("摸摸", () => this.act({ kind: "pet", dog })),
+      button("餵飯", () => this.act({ kind: "feed", dog, food: "meal" })),
+      ...(hasSnacks ? [button("給零食", () => this.act({ kind: "feed", dog, food: "snack" }))] : []),
+      ...Object.entries(pets[dog]?.touches ?? {}).map(([touch, spec]) => button(spec.label, () => this.act({ kind: "pet", dog, touch }))),
+      ...(dog === "black" ? [button("丟球", () => this.act({ kind: "throw_ball" }))] : []),
+    );
   }
 }

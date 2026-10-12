@@ -40,8 +40,13 @@ const storage = browserStorage();
 const game = createGame(content, storage);
 let dollsSave = loadDolls(storage, content.clothes);
 
-function apply(action) {
-  try { game.apply(action); } catch (error) { flash(error.message); }
+/** 套用一個動作；doer 是做這件事的娃娃（{ name, spot }）。成功回傳這次新寫的那筆日誌（沒寫就 null），失敗跳提示、回 null。 */
+function apply(action, doer) {
+  const before = game.state.journal.at(-1);
+  try {
+    const entry = game.apply(action, doer).journal.at(-1);
+    return entry !== before ? entry : null;
+  } catch (error) { flash(error.message); return null; }
 }
 
 function flash(message) {
