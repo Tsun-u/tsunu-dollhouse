@@ -102,14 +102,35 @@ export class House {
     this.deps.updateDoll(id, { spot, asleep: false });
   }
 
-  /** 選取的娃娃做一件要進規則的事：帶上她是誰、站在哪；成功就把日誌那句演出來。 */
-  act(action) {
-    const doll = this.selectedDoll;
+  dollById(id) {
+    return this.deps.dolls().dolls.find((doll) => doll.id === id) ?? null;
+  }
+
+  /** 娃娃（預設選取的那個）做一件要進規則的事：帶上她是誰、站在哪；成功就把日誌那句演出來。 */
+  act(action, doll = this.selectedDoll) {
     if (!doll) return;
     const entry = this.deps.apply(action, { name: doll.name, spot: doll.spot });
     if (!entry) return;
     const watchers = [...this.people.values()].filter((who) => who.room === this.roomId);   // 小黑撿完球跑回他們身邊
     this.play(this.personFor(doll), entry.text, { spot: doll.spot, watchers });
+  }
+
+  /** 家具（洗手台、爐台）旁邊、這個娃娃站得進去又沒有別人的格子裡離 from 最近的那格；from 已經緊鄰就是 from；沒有就 null。 */
+  besideFree(piece, from, dollId) {
+    const cells = this.room.cellsOf(piece).map((key) => key.split(",").map(Number)).map(([x, y]) => ({ x, y }));
+    const touching = (cell) => cells.some((c) => Math.abs(c.x - cell.x) + Math.abs(c.y - cell.y) === 1);
+    if (from.room === this.roomId && touching(from)) return from;
+    return cells.flatMap(({ x, y }) => [{ x: x + 1, y }, { x: x - 1, y }, { x, y: y + 1 }, { x, y: y - 1 }])
+      .filter((cell) => touching(cell) && this.standable(cell, dollId))
+      .sort((a, b) => Math.hypot(a.x - from.x, a.y - from.y) - Math.hypot(b.x - from.x, b.y - from.y))[0] ?? null;
+  }
+
+  /** 先走到家具旁邊的空位再做（洗手台、爐台）；旁邊站不下就原地做，讓規則說要站到哪。 */
+  atPiece(piece, action, doll = this.selectedDoll) {
+    if (!doll) return;
+    const spot = this.besideFree(piece, doll.spot, doll.id);
+    if (spot && (spot.x !== doll.spot.x || spot.y !== doll.spot.y || doll.spot.room !== this.roomId)) this.moveDoll(doll.id, { room: this.roomId, x: spot.x, y: spot.y });
+    this.act(action, this.dollById(doll.id));
   }
 
   /** 這件家具上離點的地方最近、這個娃娃坐得下的位置（床照枕頭那一排）；坐不下就 null。 */
@@ -237,6 +258,25 @@ export class House {
     if (spec?.switch) actions.push(button(piece.on ? "關燈" : "開燈", () => this.act({ kind: "toggle", id: piece.id }), ""));
     if (spec?.readable && this.deps.content.fortunes.length) actions.push(button("翻書", () => this.act({ kind: "read", id: piece.id }), ""));
     if (spec?.plant) actions.push(button("澆水", () => this.act({ kind: "water", id: piece.id }), ""));
+    if (spec?.washbasin && doll) {   // 洗手台：洗手、刷牙；同一間房的娃娃可以一起刷牙（兩人各自走到旁邊、各自刷）
+      const teeth = { kind: "wash", what: "teeth" };
+      actions.push(button("洗手", () => this.atPiece(piece, { kind: "wash", what: "hands" }), ""), button("刷牙", () => this.atPiece(piece, teeth), ""));
+      for (const other of this.deps.dolls().dolls.filter((d) => d.id !== doll.id && d.spot.room === this.roomId)) {
+        actions.push(button(`跟${other.name}一起刷牙`, () => { this.atPiece(piece, teeth, doll); this.atPiece(piece, teeth, this.dollById(other.id)); }, ""));
+      }
+    }
+    if (spec?.stove && doll) {   // 爐台：用三消材料煮家常菜，材料不夠的反灰、寫上缺什麼；家裡有煮好的就能吃
+      const { dishes, recipes } = this.deps.content;
+      const { materials } = this.deps.game.state;
+      for (const [id, dish] of Object.entries(dishes)) {
+        const missing = Object.entries(dish.ingredients).filter(([chain, need]) => (materials[chain] ?? 0) < need)
+          .map(([chain, need]) => `${recipes[chain]?.label ?? chain} ${need - (materials[chain] ?? 0)}`);
+        const cook = button(missing.length ? `煮${dish.label}（缺${missing.join("、")}）` : `煮${dish.label}`, () => this.atPiece(piece, { kind: "cook", dish: id }), "");
+        cook.disabled = missing.length > 0;
+        actions.push(cook);
+      }
+      for (const [id, count] of Object.entries(this.deps.game.state.dishes ?? {})) if (count > 0) actions.push(button(`吃${dishes[id]?.label ?? id}（${count}）`, () => this.act({ kind: "eat", dish: id }), ""));
+    }
     for (const [dog, pet] of Object.entries(this.deps.content.pets)) {
       if (spec?.bowl) actions.push(button(`倒飼料給${pet.label}`, () => this.act({ kind: "feed", dog, food: "meal" }), ""));
       if (spec?.snacks) actions.push(button(`拿零食給${pet.label}`, () => this.act({ kind: "feed", dog, food: "snack" }), ""));
