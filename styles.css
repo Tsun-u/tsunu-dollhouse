@@ -103,6 +103,37 @@ button:disabled { background: var(--line); color: var(--muted); cursor: default;
   user-select: none;
 }
 
+#streetCanvas {
+  width: 100%;
+  max-width: 760px;   /* 選店用的街景，不用跟店內一樣大 */
+  height: auto;
+  display: block;
+  margin: 0 auto 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* 租店面、店內裝潢的面板 */
+.rent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-size: 14px;
+}
+.rent[hidden] { display: none; }
+.rent #rentChoices, .rent #decorChoices { display: flex; flex-wrap: wrap; gap: 8px; }
+#decorChoices button.chosen { outline: 2px solid #c98a4a; font-weight: bold; }
+.rent button.quiet, #cafeProducts button.quiet { background: var(--line); color: var(--ink); }
+
+#puzzleShop { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; font-size: 14px; }
+
 #room {
   width: 100%;
   height: auto;

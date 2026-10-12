@@ -25,7 +25,7 @@
       <button data-tab="puzzle">三消</button>
       <button data-tab="workshop">工坊</button>
       <button data-tab="closet">衣櫃</button>
-      <button data-tab="cafe">咖啡廳</button>
+      <button data-tab="cafe">商店街</button>
       <button data-tab="shop">家具店</button>
       <button data-tab="dolls">娃娃</button>
     </nav>
@@ -68,7 +68,7 @@
   </section>
 
   <section id="puzzle" class="tab">
-    <div class="panel-head"><span id="puzzleInfo"></span><span><button id="puzzleCoop" hidden>一起玩</button> <button id="puzzleStart">開一盤</button></span></div>
+    <div class="panel-head"><span id="puzzleInfo"></span><span><select id="puzzleShop" title="這一盤幫哪家店備料" hidden></select> <button id="puzzleCoop" hidden>一起玩</button> <button id="puzzleStart">開一盤</button></span></div>
     <div id="board"></div>
   </section>
 
@@ -81,9 +81,20 @@
   </section>
 
   <section id="cafe" class="tab">
+    <canvas id="streetCanvas" title="點一樓看店、點出租的店面租店、點二樓回家"></canvas>
+    <div id="rentPanel" class="rent" hidden>
+      <span id="rentTitle"></span>
+      <span id="rentChoices"></span>
+      <button id="rentCancel" class="quiet">先不要</button>
+    </div>
     <div class="panel-head"><span id="cafeInfo"></span><button id="cafeToggle"></button></div>
     <canvas id="cafeCanvas"></canvas>
-    <div class="panel-head"><span>櫃台上的商品（點客人就出餐）</span></div>
+    <div id="decorPanel" class="rent" hidden>
+      <span id="decorPanelTitle"></span>
+      <span id="decorChoices"></span>
+      <button id="decorClose" class="quiet">關閉</button>
+    </div>
+    <div class="panel-head"><span id="cafeProductsHint">櫃台上的商品（點客人就出餐）</span></div>
     <div id="cafeProducts" class="chips"></div>
   </section>
 

@@ -3,10 +3,12 @@
 
 import { loadSkeleton, samplePose } from "../vendor/player/player.js";
 import { BODIES, CLOTHES_COLORS, headParts, randomLooks } from "../vendor/rules/looks.js";
+import { SHOP_LABEL, SHOP_RENT } from "../vendor/rules/state.js";
 import { CafeView } from "../vendor/web/cafe-view.js";
 import { CATEGORY_SLOT, SLOT_LABEL, dressUp, dyeable } from "../vendor/web/dress.js";
 import { IconSheet } from "../vendor/web/icons.js";
 import { PuzzleView } from "../vendor/web/puzzle-view.js";
+import { StreetView } from "../vendor/web/street-view.js";
 import { WorkshopView } from "../vendor/web/workshop-view.js";
 import { startCafeClock } from "./cafe-clock.js";
 import { setupCreator } from "./creator.js";
@@ -69,12 +71,62 @@ const house = new House({
 });
 
 const icons = new IconSheet(content.recipes, () => renderAll());
-const puzzle = new PuzzleView($("board"), $("puzzleInfo"), $("puzzleStart"), icons, apply, content.settings.stamina);
+const puzzle = new PuzzleView($("board"), $("puzzleInfo"), $("puzzleStart"), icons, apply, content.settings.stamina, () => $("puzzleShop").value || undefined);
 const workshop = new WorkshopView({ materials: $("materials"), grid: $("grid"), products: $("products") }, content.recipes, icons, apply);
 const guests = Object.entries(BODIES).map(([body, spec]) => ({ body, views: { front: skeletons[spec.views.front], front34: skeletons[spec.views.front34], back34: skeletons[spec.views.back34] } }));
 const cafe = new CafeView($("cafeCanvas"), { skeleton: skeletons.front, guests, looks: { BODIES, CLOTHES_COLORS, headParts, randomLooks }, clothes: content.clothes, dress: { dressUp, dyeable, CATEGORY_SLOT }, animations, samplePose }, icons, apply);
-$("cafeToggle").onclick = () => apply({ kind: "shop_open", open: !game.state.shops.cafe.open });
 startCafeClock(game, apply);
+
+// ───────── 商店街：咖啡廳加上租來的雜貨店、服飾店（跟小屋一樣），每家店可以換裝潢 ─────────
+
+let viewingShop = "cafe";   // 商店街上正在看哪家店
+const street = new StreetView($("streetCanvas"), {
+  onPick: (kind) => { viewingShop = kind; cafe.setShop(kind); $("rentPanel").hidden = true; decorSpot = null; renderCafe(); },
+  onRent: (lot) => openRent(lot),
+  onHome: () => showTab("home"),
+});
+$("cafeToggle").onclick = () => apply({ kind: "shop_open", open: !game.state.shops[viewingShop].open, shop: viewingShop });
+$("rentCancel").onclick = () => { $("rentPanel").hidden = true; };
+
+/** 店內裝潢：點裝飾點的小刷子，列出三款風格（買過的「換上」、正在用的亮著）和原裝。 */
+let decorSpot = null;
+cafe.decor = content.decor;
+cafe.onDecor = (spot) => { decorSpot = spot; renderDecorPanel(); };
+$("decorClose").onclick = () => { decorSpot = null; $("decorPanel").hidden = true; };
+function renderDecorPanel() {
+  const { state } = game;
+  const shop = state.shops[viewingShop];
+  if (!decorSpot || !shop) { $("decorPanel").hidden = true; return; }
+  const spec = content.decor.spots[decorSpot];
+  const owned = shop.decor?.owned?.[decorSpot] ?? [];
+  const chosen = shop.decor?.chosen?.[decorSpot] ?? null;
+  const name = content.decor.shops[viewingShop]?.[decorSpot] ?? spec.label;
+  $("decorPanelTitle").textContent = `${SHOP_LABEL[viewingShop]}的${name}（存款 $${state.money}）`;
+  const choice = (text, theme, action, disabled = false) => {
+    const b = Object.assign(document.createElement("button"), { textContent: text, disabled, onclick: () => apply(action) });
+    if (theme === chosen) b.className = "chosen";
+    return b;
+  };
+  $("decorChoices").replaceChildren(
+    choice("原裝", null, { kind: "set_decor", shop: viewingShop, spot: decorSpot, theme: null }, chosen === null),
+    ...Object.entries(content.decor.themes).map(([theme, label]) => owned.includes(theme)
+      ? choice(theme === chosen ? `${label}（使用中）` : `${label}：換上`, theme, { kind: "set_decor", shop: viewingShop, spot: decorSpot, theme }, theme === chosen)
+      : choice(`${label}：買 $${spec.price}`, theme, { kind: "buy_decor", shop: viewingShop, spot: decorSpot, theme }, state.money < spec.price)),
+  );
+  $("decorPanel").hidden = false;
+}
+
+/** 點到沒租的店面：列出還沒開的店與租金。 */
+function openRent(lot) {
+  const { state } = game;
+  const choices = Object.entries(SHOP_RENT).filter(([kind]) => !state.shops[kind]);
+  $("rentTitle").textContent = choices.length ? `${lot === "left" ? "左邊" : "右邊"}的店面出租中，要開哪家店？（存款 $${state.money}）` : "兩家店都開了。";
+  $("rentChoices").replaceChildren(...choices.map(([kind, rent]) => Object.assign(document.createElement("button"), {
+    textContent: `開${SHOP_LABEL[kind]}（租金 $${rent}）`, disabled: state.money < rent,
+    onclick: () => { $("rentPanel").hidden = true; if (apply({ kind: "rent_shop", lot, shop: kind })) { viewingShop = kind; cafe.setShop(kind); renderCafe(); } },
+  })));
+  $("rentPanel").hidden = false;
+}
 
 /** 分頁：切到咖啡廳時從娃娃裡隨機抽一位顧店。 */
 for (const tabButton of $("tabs").children) {
@@ -143,22 +195,34 @@ function renderShop() {
 
 // ───────── 咖啡廳 ─────────
 
+/** 正在看的那家店：客人、開關、這家店的商品（服飾店做好的衣服可以收進衣櫃）；街景、三消選店跟著更新。 */
 function renderCafe() {
   const { state } = game;
-  const cafe = state.shops.cafe;
-  const waiting = cafe.customers.length;
+  if (!state.shops[viewingShop]) { viewingShop = "cafe"; cafe.setShop("cafe"); }
+  const shop = state.shops[viewingShop];
+  const label = SHOP_LABEL[viewingShop];
+  const waiting = shop.customers.length;
   const keeper = $("cafeInfo").dataset.keeper ? `今天${$("cafeInfo").dataset.keeper}顧店。` : "";
-  $("cafeInfo").textContent = keeper + (cafe.open ? (waiting ? `${waiting} 位客人在等，累計服務 ${cafe.served} 人` : `店開著，等客人上門（累計服務 ${cafe.served} 人）`) : "打烊中");
-  $("cafeToggle").textContent = cafe.open ? "打烊" : "開門";
-  $("cafeProducts").replaceChildren(...Object.entries(state.products).map(([chain, count]) => {
+  $("cafeInfo").textContent = keeper + (shop.open ? (waiting ? `${label}：${waiting} 位客人在等，累計服務 ${shop.served} 人` : `${label}開著，等客人上門（累計服務 ${shop.served} 人）`) : `${label}打烊中`);
+  $("cafeToggle").textContent = shop.open ? "打烊" : "開門";
+  $("cafeProductsHint").textContent = viewingShop === "boutique" ? "櫃台上的衣服（點客人就賣出；想自己穿就收進衣櫃）" : "櫃台上的商品（點客人就出餐）";
+  const mine = Object.entries(state.products).filter(([chain]) => (content.recipes[chain]?.shop ?? "cafe") === viewingShop);
+  $("cafeProducts").replaceChildren(...mine.map(([chain, count]) => {
     const recipe = content.recipes[chain];
     const chip = Object.assign(document.createElement("span"), { className: "item" });
     const icon = Object.assign(document.createElement("span"), { className: "icon" });
     icons.apply(icon, chain, (recipe?.tiers.length ?? 1) - 1);
     chip.append(icon, `${recipe?.tiers.at(-1) ?? chain} ×${count}`);
+    if (recipe?.clothes) chip.append(Object.assign(document.createElement("button"), { className: "quiet", textContent: "收進衣櫃", onclick: () => apply({ kind: "keep_clothes", chain }) }));
     return chip;
   }));
-  if (!$("cafeProducts").children.length) $("cafeProducts").textContent = "櫃台空空的，去工坊做點東西。";
+  if (!mine.length) $("cafeProducts").textContent = "櫃台空空的，去工坊做點東西。";
+  street.setState(state.shops, viewingShop);
+  renderDecorPanel();
+  const opened = Object.keys(state.shops);
+  $("puzzleShop").hidden = opened.length < 2;
+  const picked = $("puzzleShop").value;
+  $("puzzleShop").replaceChildren(...opened.map((kind) => Object.assign(document.createElement("option"), { value: kind, textContent: `幫${SHOP_LABEL[kind]}備料`, selected: kind === picked })));
 }
 
 // ───────── 衣櫃：幫娃娃換衣服（衣服從遊戲存檔的衣櫃挑，穿在娃娃存檔） ─────────
@@ -373,4 +437,4 @@ renderAll();
 if (!dollsSave.dolls.length) { showTab("dolls"); creator.open(null, { first: true }); }
 $("loading").classList.add("done");
 
-window.__dollhouse = { game, get dolls() { return dollsSave; }, house };   // 開發時從主控台看狀態
+window.__dollhouse = { game, get dolls() { return dollsSave; }, house, cafe };   // 開發時從主控台看狀態
