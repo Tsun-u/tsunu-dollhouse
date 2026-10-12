@@ -164,8 +164,9 @@ export class House {
     const free = openCells(home, catalog).some((c) => c.x === cell.x && c.y === cell.y) || !!seat;
     const others = this.deps.dolls().dolls.filter((doll) => doll.id !== exceptId && doll.spot.room === this.roomId);
     const taken = others.some((doll) => doll.spot.x === cell.x && doll.spot.y === cell.y);
-    const tubInUse = catalog[seat?.item]?.seatPose === "bathe" && others.some((doll) => seatAt(home, doll.spot, catalog)?.id === seat.id);
-    return free && !taken && !tubInUse;
+    const oneAtATime = catalog[seat?.item]?.seatPose === "bathe" || !!catalog[seat?.item]?.toilet;   // 浴缸、馬桶一次一個人
+    const inUse = oneAtATime && others.some((doll) => seatAt(home, doll.spot, catalog)?.id === seat.id);
+    return free && !taken && !inUse;
   }
 
   /** 在泡澡或淋浴（沒穿衣服）。 */
@@ -261,7 +262,7 @@ export class House {
     const onThis = doll && seatAt(this.room.home, doll.spot, catalog)?.id === piece?.id;
     if (spec?.seat && doll) {
       const seat = this.seatFor(piece, doll);
-      if (seat && !onThis) actions.push(button(`${doll.name}坐下`, () => this.moveDoll(doll.id, { room: this.roomId, x: seat.x, y: seat.y }), ""));
+      if (seat && !onThis) actions.push(button(`${doll.name}${spec.toilet ? "上廁所" : "坐下"}`, () => this.moveDoll(doll.id, { room: this.roomId, x: seat.x, y: seat.y }), ""));
     }
     if (spec?.seatPose === "lounge" && doll) {   // 床：一個人躺下睡覺，睡著了就是起床
       if (onThis && doll.asleep) actions.push(button(`${doll.name}起床`, () => this.deps.updateDoll(doll.id, { asleep: false }), ""));
@@ -325,7 +326,7 @@ export class House {
       if (!washing) actions.push(button(`抱抱${other.name}`, () => this.hug(doll, other)));
       const seat = seatOf(other);
       const together = seat && seatOf(doll)?.id === seat.id;
-      if (seat && !together && !washing) actions.push(button(`坐到${other.name}旁邊`, () => this.sitBeside(doll, other, seat)));
+      if (seat && !together && !washing && !catalog[seat.item]?.toilet) actions.push(button(`坐到${other.name}旁邊`, () => this.sitBeside(doll, other, seat)));
       if (together && catalog[seat.item]?.seatPose === "lounge" && this.sleepingOn !== seat.id) actions.push(button(`跟${other.name}一起睡`, () => { this.sleepingOn = seat.id; this.render(); }));
       actions.push(button(`叫${other.name}過來`, () => this.callOver(doll, other)));
       actions.push(button(this.givingTo === other.id ? "收起" : `遞東西給${other.name}`, () => { this.givingTo = this.givingTo === other.id ? null : other.id; this.renderDollActions(); }));
@@ -344,7 +345,7 @@ export class House {
       return chip;
     };
     $("giveChoices").replaceChildren(
-      ...Object.entries(game.state.products).map(([chain, n]) => give(`遞一份${content.recipes[chain]?.tiers.at(-1) ?? chain}`, n, { kind: "give", product: chain, to: target.name })),
+      ...Object.entries(game.state.products).filter(([chain]) => !content.recipes[chain]?.clothes).map(([chain, n]) => give(   // 衣服不能吃，收進衣櫃另外處理`遞一份${content.recipes[chain]?.tiers.at(-1) ?? chain}`, n, { kind: "give", product: chain, to: target.name })),
       ...Object.entries(game.state.dishes ?? {}).filter(([, n]) => n > 0).map(([dish, n]) => give(`遞一份${content.dishes[dish]?.label ?? dish}`, n, { kind: "give", dish, to: target.name })),
     );
     if (!$("giveChoices").children.length) $("giveChoices").textContent = "家裡沒有可以遞的東西，去工坊做或爐台煮。";

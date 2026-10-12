@@ -285,6 +285,9 @@ function reduce(state, action, context) {
         case "give": {
             if (context.actor === "game")
                 throw new Error("小屋自己不遞東西。");
+            const toGuest = !!action.to && !context.doer && action.to !== "atone" && action.to !== "tsunu"; // 客人收到衣服可以穿上；遞給阿童、阿宇或娃娃都是當場吃掉
+            if (action.product && recipes[action.product]?.clothes && !toGuest)
+                throw new Error(`${productLabel(action.product)}是衣服，不能吃；做好的衣服用「收進衣櫃」收起來。`);
             if (context.doer && action.to) { // 兒童版：遞給同一間房的另一個娃娃，她當場吃掉（跟遞給阿童一樣回體力）
                 if (action.dish) {
                     const dish = context.content.dishes[action.dish];
@@ -317,7 +320,7 @@ function reduce(state, action, context) {
                 if ((state.products[action.product] ?? 0) < 1)
                     throw new Error(`沒有${productLabel(action.product)}可以遞。`);
                 const item = { kind: "product", chain: action.product, by: context.actor, at };
-                return { state: { ...state, products: adjust(state.products, action.product, -1), visitors: { ...state.visitors, [action.to]: { ...guest, holding: { item } } } }, note: `遞給${guest.name}一份${productLabel(action.product)}`, to: action.to };
+                return { state: { ...state, products: adjust(state.products, action.product, -1), visitors: { ...state.visitors, [action.to]: { ...guest, holding: { item } } } }, note: `遞給${guest.name}${foodName(item, context.content)}`, to: action.to };
             }
             if (!action.product)
                 throw new Error("要遞什麼？");
@@ -777,14 +780,18 @@ function reduce(state, action, context) {
             const together = pose === "bathe" && other.room === roomId && seatAt(room, other, furniture)?.id === seat.id;
             if (together && state.door?.open)
                 throw new Error("有客人在，先不要一起泡澡。");
+            const toilet = !!seat && !!furniture[seat.item]?.toilet;
+            if (toilet && ((other.room === roomId && seatAt(room, other, furniture)?.id === seat.id) || visitorOnSeat(state, room, roomId, seat, furniture)))
+                throw new Error("馬桶有人在用，等一下。");
             if (visitorAt(state, { room: roomId, ...cell }))
                 throw new Error("那裡有客人站著。");
             if (pose && visitorOnSeat(state, room, roomId, seat, furniture))
                 throw new Error(pose === "lounge" ? "床上有客人了。" : `${label(seat.item)}裡有客人，等一下。`); // 床、浴缸、淋浴間不跟客人共用（訪客只在門開著時在屋裡）
             const sat = !seat ? null
-                : pose === "shower" ? `走進${label(seat.item)}洗澡`
-                    : pose === "bathe" ? (together ? `泡進${label(seat.item)}，一起泡澡` : `泡進${label(seat.item)}`)
-                        : `坐到${label(seat.item)}上`;
+                : toilet ? "上了個廁所"
+                    : pose === "shower" ? `走進${label(seat.item)}洗澡`
+                        : pose === "bathe" ? (together ? `泡進${label(seat.item)}，一起泡澡` : `泡進${label(seat.item)}`)
+                            : `坐到${label(seat.item)}上`;
             const note = [woke?.note, moved, sat].filter(Boolean).join("，") || null;
             return { state: { ...base, positions: { ...base.positions, [context.actor]: { room: roomId, ...cell } } }, note };
         }
@@ -1141,7 +1148,11 @@ export function returnHolding(state, visitor, catalog) {
 export function foodName(item, content) {
     if (item.kind === "dish")
         return `${ACTOR_NAME[item.by]}煮的${item.text ?? content.dishes[item.dish]?.label ?? item.dish}`;
-    return `一份${content.recipes[item.chain]?.tiers.at(-1) ?? item.chain}`;
+    return `${heldClothes(item, content) ? "一件" : "一份"}${content.recipes[item.chain]?.tiers.at(-1) ?? item.chain}`;
+}
+/** 這樣東西是不是衣服（服飾店做的商品）：是的話回傳穿起來是哪件衣服的代號，不能吃。 */
+export function heldClothes(item, content) {
+    return item.kind === "product" ? content.recipes[item.chain]?.clothes : undefined;
 }
 /** 阿童吃了這樣東西回幾點體力：家常菜照菜單，商品 1 點。 */
 export function foodStamina(item, content) {

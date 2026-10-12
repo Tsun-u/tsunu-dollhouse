@@ -455,6 +455,8 @@
   "height": 0.9,
   "color": "#f2efe8",
   "price": 260,
+  "seat": true,
+  "toilet": true,
   "image": "assets/furniture/toilet.png",
   "anchor": {
    "x": 511,
