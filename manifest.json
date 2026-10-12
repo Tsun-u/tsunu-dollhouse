@@ -1,0 +1,15 @@
+{
+  "name": "小屋娃娃屋",
+  "short_name": "娃娃屋",
+  "description": "捏自己的娃娃、佈置房間、開店的數位娃娃屋",
+  "lang": "zh-Hant",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3ead9",
+  "theme_color": "#f3ead9",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
