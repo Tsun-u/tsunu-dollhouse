@@ -70,6 +70,7 @@ export class Skeleton {
     this.images = images;
     this.offsets = offsets;   // 裁過的零件圖在原畫布上的左上角（scripts/asset_images.py 寫的）
     this.forward = data.forward ?? 1;
+    this.partsLoaded = 0;   // 開頁後才載好的零件（lazyOutfits）有幾片：多一片，畫好的人像（memo）就要重畫
     this.bones = new Map(data.bones.map(b => [b.name, b]));
     this.rebuild();
   }
@@ -282,7 +283,7 @@ export class Skeleton {
    *  underwear：false 就連內衣也不畫（泡澡）。
    *  layer："behind" 只畫皮膚底下的零件（後髮），"front" 不畫它們；沒給就全畫。從後面抱時被抱的人的後髮要塞到抱人的身體後面。
    *  灰稿素體沒有輪廓線，整個人（或 only 拆出來的那幾根）畫好後在最外圈補一道外框（OUTLINE_COLOR）。 */
-  /** memo（呼叫端每個人一份）＋poseTolerance：同一個人衣服、縮放、面向都沒變，姿勢跟上次畫的差不到 poseTolerance
+  /** memo（呼叫端每個人一份）＋poseTolerance：同一個人衣服、縮放、面向都沒變、也沒有新載好的零件，姿勢跟上次畫的差不到 poseTolerance
    *  （角度幾度、位移幾個骨架單位）時，直接貼上次畫好的人像（含外框、交疊線），人移動了就平移過去貼。
    *  站、坐、躺的呼吸起伏不到 1 px，重用看不出差別；畫一個人要疊十幾次圖，同一間房人多時靠這個省下大半。
    *  看姿勢不看時間：畫面越慢越該重用，不能因為一幀太久就全部重畫。回傳這次有沒有真的重畫（false＝貼了上次的人像）。 */
@@ -291,7 +292,7 @@ export class Skeleton {
     const { x = 0, y = 0, scale = 1, facing = 1, memo = null, poseTolerance = 0 } = options;
     const m = ctx.getTransform();
     const origin = [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f];   // 這次畫在畫面上的哪裡（人像本身跟位置無關）
-    const inputs = memo && [this, scale, facing, m.a, m.b, m.c, m.d, options.outfits, options.skin, options.bodyTint, options.only, options.layer, options.underwear];
+    const inputs = memo && [this, this.partsLoaded, scale, facing, m.a, m.b, m.c, m.d, options.outfits, options.skin, options.bodyTint, options.only, options.layer, options.underwear];
     if (memo?.canvas && poseTolerance > 0 && inputs.every((value, i) => value === memo.inputs[i]) && posesClose(pose, memo.pose, poseTolerance)) {
       ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.drawImage(memo.canvas, memo.left + origin[0] - memo.origin[0], memo.upper + origin[1] - memo.origin[1]);
@@ -638,14 +639,15 @@ export async function loadSkeleton(url, assetBase, query = "", { lazyOutfits = f
   const bodySlots = data.bones.flatMap(b => [...b.slots, ...Object.values(b.variants || {}).flat()]);
   const names = [...new Set(lazyOutfits ? bodySlots : [...bodySlots, ...outfitSlots])];
   const images = {};
+  let skeleton = null;
   const loadPart = (n) => new Promise(resolve => {
     const img = new Image();
-    img.onload = () => { images[n] = img; resolve(); };
+    img.onload = () => { images[n] = img; if (skeleton) skeleton.partsLoaded++; resolve(); };
     img.onerror = () => { console.error(`載不到零件圖 ${n}`); resolve(); };
     img.src = assetBase + n + query;
   });
   await Promise.all(names.map(loadPart));
-  const skeleton = new Skeleton(data, images, offsets);
+  skeleton = new Skeleton(data, images, offsets);
   if (lazyOutfits) skeleton.loadPart = loadPart;
   return skeleton;
 }

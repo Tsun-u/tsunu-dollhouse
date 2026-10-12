@@ -509,10 +509,7 @@ function reduce(state, action, context) {
                 throw new Error("小屋自己不刷牙。");
             const here = state.positions[context.actor];
             const room = findRoom(state, here.room);
-            const basin = pieceNextTo(room, here, furniture, (spec) => !!spec.washbasin);
-            if (!basin)
-                throw new Error("要先走到洗手台前。");
-            const verb = action.what === "teeth" ? "刷牙" : "洗手";
+            const { basin, verb } = washAt(room, here, action.what, furniture);
             if (!action.together)
                 return { state, note: verb };
             if (state.door?.open)
@@ -520,7 +517,7 @@ function reduce(state, action, context) {
             const partner = context.actor === "atone" ? "tsunu" : "atone";
             if (partner === "tsunu" && !state.tsunu.home)
                 throw new Error("阿宇不在家。");
-            const spot = freeSpotBeside(room, basin, here, furniture);
+            const spot = freeSpotBeside(room, basin, here, furniture, visitorCells(state, here.room));
             if (!spot)
                 throw new Error("洗手台前擠不下兩個人。");
             const positions = { ...state.positions, [partner]: { room: here.room, ...spot } };
@@ -554,53 +551,19 @@ function reduce(state, action, context) {
         case "pet": {
             if (context.actor === "game")
                 throw new Error("小屋自己不摸狗。");
-            const dog = pets[action.dog];
-            if (!dog)
-                throw new Error(`家裡沒有「${action.dog}」這隻狗。`);
-            if (!action.touch)
-                return { state, note: `摸摸${dog.label}，${dog.label}開心地搖尾巴` };
-            const touch = dog.touches?.[action.touch];
-            if (!touch)
-                throw new Error(`${dog.label}沒有「${action.touch}」這個互動。`);
-            return { state, note: touch.note };
+            return { state, note: petDog(pets, action.dog, action.touch) };
         }
         case "feed": {
             if (context.actor === "game")
                 throw new Error("小屋自己不餵狗。");
-            const dog = pets[action.dog];
-            if (!dog)
-                throw new Error(`家裡沒有「${action.dog}」這隻狗。`);
-            if (action.food === "snack") {
-                const hasCabinet = Object.values(state.rooms).some((room) => room.placed.some((piece) => furniture[piece.item]?.snacks));
-                if (!hasCabinet)
-                    throw new Error("家裡還沒有零食櫃。");
-                return { state, note: `給${dog.label}一塊零食，${dog.label}坐得好端正` };
-            }
-            const now = context.now();
-            const lastMeal = state.fed?.[action.dog];
-            if (lastMeal && now.getTime() - new Date(lastMeal).getTime() < FULL_HOURS * 3_600_000)
-                throw new Error(`${dog.label}剛吃過，還不餓。`);
-            const hungry = isHungry(state, action.dog, now);
-            return { state: { ...state, fed: { ...state.fed, [action.dog]: now.toISOString() } }, note: hungry ? `餵${dog.label}吃飯，${dog.label}餓壞了，吃得好快` : `餵${dog.label}吃飯` };
+            return feedDog(state, context.content, action.dog, action.food, context.now());
         }
-        case "toggle": {
-            const { piece } = findPlaced(state, action.id);
-            if (!furniture[piece.item]?.switch)
-                throw new Error(`${label(piece.item)}沒有開關。`);
-            const on = !piece.on;
-            return { state: replacePlaced(state, { ...piece, on }), note: `把${label(piece.item)}${on ? "打開" : "關掉"}` };
-        }
+        case "toggle":
+            return toggleSwitch(state, furniture, action.id);
         case "read": {
             if (context.actor === "game")
                 throw new Error("小屋自己不看書。");
-            const { piece } = findPlaced(state, action.id);
-            if (!furniture[piece.item]?.readable)
-                throw new Error(`${label(piece.item)}上沒有書。`);
-            const lines = [...fortunes, ...state.shelf];
-            if (!lines.length)
-                throw new Error("書櫃是空的。");
-            const line = lines[context.seed() % lines.length];
-            return { state, note: `翻到一句：${line}` };
+            return { state, note: readLine(state, furniture, action.id, [...fortunes, ...state.shelf], context.seed()) };
         }
         case "shelve": {
             if (context.actor === "game")
@@ -615,11 +578,7 @@ function reduce(state, action, context) {
         case "water": {
             if (context.actor === "game")
                 throw new Error("小屋自己不澆水。");
-            const { piece } = findPlaced(state, action.id);
-            if (!furniture[piece.item]?.plant)
-                throw new Error(`${label(piece.item)}不用澆水。`);
-            const thirsty = isThirsty(piece, context.now());
-            return { state: replacePlaced(state, { ...piece, wateredAt: context.now().toISOString() }), note: thirsty ? `幫${label(piece.item)}澆水，它精神回來了` : `幫${label(piece.item)}澆水` };
+            return waterPlant(state, furniture, action.id, context.now());
         }
         case "put_on_table": {
             if (context.actor === "game")
@@ -693,7 +652,7 @@ function reduce(state, action, context) {
                 return { state, note };
             }
             const spot = state.positions[target];
-            const cell = cuddleSpot(findRoom(state, spot.room), spot, behind, furniture);
+            const cell = cuddleSpot(findRoom(state, spot.room), spot, behind, furniture, visitorCells(state, spot.room));
             if (!cell)
                 throw new Error(`${ACTOR_NAME[target]}旁邊沒有位子可以靠過去。`);
             return { state: { ...state, positions: { ...state.positions, [context.actor]: { room: spot.room, ...cell } } }, note };
@@ -705,7 +664,7 @@ function reduce(state, action, context) {
             if (target === "tsunu" && !state.tsunu.home)
                 throw new Error("阿宇不在家，叫不到。");
             const spot = state.positions[context.actor];
-            const cell = cuddleSpot(findRoom(state, spot.room), spot, false, furniture);
+            const cell = cuddleSpot(findRoom(state, spot.room), spot, false, furniture, visitorCells(state, spot.room));
             if (!cell)
                 throw new Error("旁邊沒有位子讓對方站。");
             return { state: { ...state, positions: { ...state.positions, [target]: { room: spot.room, ...cell } } }, note: `叫${ACTOR_NAME[target]}過來` };
@@ -732,18 +691,13 @@ function reduce(state, action, context) {
         case "wake": {
             if (!state.sleeping)
                 throw new Error("沒有人在睡。");
-            const hours = (context.now().getTime() - new Date(state.sleeping.since).getTime()) / 3_600_000;
-            const length = hours < 1 ? `${Math.max(1, Math.round(hours * 60))} 分鐘` : `${hours.toFixed(1)} 小時`;
+            const length = sleepLength(state.sleeping.since, context.now());
             return { state: { ...state, sleeping: null }, note: context.actor === "game" || state.sleeping.alone ? `睡了 ${length}，醒了` : `一起睡了 ${length}` };
         }
         case "throw_ball": {
             if (context.actor === "game")
                 throw new Error("小屋自己不丟球。");
-            const spots = openCells(findRoom(state, actorRoom(state, context.actor)), furniture);
-            if (!spots.length)
-                throw new Error("沒有地方可以丟。");
-            const cell = spots[context.seed() % spots.length];
-            return { state, note: `丟球給小黑，球滾到 (${cell.x}, ${cell.y})` };
+            return { state, note: throwBall(state, furniture, actorRoom(state, context.actor), context.seed()) };
         }
         case "event": {
             if (context.actor !== "game")
@@ -762,7 +716,9 @@ function reduce(state, action, context) {
             assertWalkable(room, tapped, furniture);
             const seat = seatAt(room, tapped, furniture);
             const other = state.positions[context.actor === "atone" ? "tsunu" : "atone"];
-            const cell = seat && furniture[seat.item]?.seatPose === "lounge" ? pillowSpot(seat, tapped, other.room === roomId ? other : null, furniture) : tapped;
+            const wanted = seat && furniture[seat.item]?.seatPose === "lounge" ? pillowSpot(seat, tapped, other.room === roomId ? other : null, furniture) : tapped;
+            const blockedDoor = roomId !== from && !seat && visitorAt(state, { room: roomId, ...wanted }); // 換房間時門口站著客人：站到門口旁邊最近的空位
+            const cell = blockedDoor ? freeCellsNear(state, roomId, tapped, furniture, peopleSpots(state))[0] ?? wanted : wanted;
             const woke = state.sleeping && (!state.sleeping.alone || state.sleeping.alone === context.actor) ? reduce(state, { kind: "wake" }, context) : null; // 起床：一起睡時誰走動都算，一個人睡時只有睡的人自己起來才算
             const base = woke ? woke.state : state;
             const moved = roomId !== from ? `走到${room.name}` : null;
@@ -772,6 +728,8 @@ function reduce(state, action, context) {
                 throw new Error("有客人在，先不要一起泡澡。");
             if (visitorAt(state, { room: roomId, ...cell }))
                 throw new Error("那裡有客人站著。");
+            if (pose && visitorOnSeat(state, room, roomId, seat, furniture))
+                throw new Error(pose === "lounge" ? "床上有客人了。" : `${label(seat.item)}裡有客人，等一下。`); // 床、浴缸、淋浴間不跟客人共用（訪客只在門開著時在屋裡）
             const sat = !seat ? null
                 : pose === "shower" ? `走進${label(seat.item)}洗澡`
                     : pose === "bathe" ? (together ? `泡進${label(seat.item)}，一起泡澡` : `泡進${label(seat.item)}`)
@@ -897,13 +855,28 @@ function made(state, chain, context) {
  *  taken 是已經有人站的位置（開門時屋主自己要被挪過去，傳空的）。 */
 export function entranceSpots(state, catalog, count, taken) {
     const roomId = state.rooms.living ? "living" : FIRST_ROOM;
-    const room = findRoom(state, roomId);
-    const door = room.doors[0];
-    const origin = door ? doorCell(door) : { x: 0, y: 0 };
-    const busy = new Set(taken.filter((spot) => spot.room === roomId).map((spot) => `${spot.x},${spot.y}`));
+    const door = findRoom(state, roomId).doors[0];
+    return freeCellsNear(state, roomId, door ? doorCell(door) : { x: 0, y: 0 }, catalog, taken).slice(0, count);
+}
+/** 這間房裡站得進去、不是座位、沒人站（taken）的格子，照離 origin 近到遠排。 */
+export function freeCellsNear(state, roomId, origin, catalog, taken) {
+    const busy = new Set(taken.filter((spot) => spot.room === roomId).map(cellKey));
     const distance = (cell) => Math.abs(cell.x - origin.x) + Math.abs(cell.y - origin.y);
-    return openCells(room, catalog).filter((cell) => !busy.has(`${cell.x},${cell.y}`))
-        .sort((a, b) => distance(a) - distance(b)).slice(0, count).map((cell) => ({ room: roomId, ...cell }));
+    return openCells(findRoom(state, roomId), catalog).filter((cell) => !busy.has(cellKey(cell)))
+        .sort((a, b) => distance(a) - distance(b)).map((cell) => ({ room: roomId, ...cell }));
+}
+/** 屋裡有人站的位置：阿童、在家的阿宇、訪客（except 那位訪客不算）。 */
+export function peopleSpots(state, except) {
+    return [state.positions.atone, ...(state.tsunu.home ? [state.positions.tsunu] : []),
+        ...Object.entries(state.visitors ?? {}).filter(([id]) => id !== except).map(([, visitor]) => visitor.spot)];
+}
+/** 這間房裡訪客站的格子（"x,y"）：給人找位子時跳過。 */
+function visitorCells(state, roomId) {
+    return new Set(Object.values(state.visitors ?? {}).filter((visitor) => visitor.spot.room === roomId).map((visitor) => cellKey(visitor.spot)));
+}
+/** 有訪客在這件可坐的家具上（床、浴缸、淋浴間、沙發）。 */
+function visitorOnSeat(state, room, roomId, seat, catalog) {
+    return Object.values(state.visitors ?? {}).some((visitor) => visitor.spot.room === roomId && seatAt(room, visitor.spot, catalog)?.id === seat.id);
 }
 /** 這一格站著哪位訪客（id），沒有就 null。 */
 export function visitorAt(state, spot) {
@@ -970,11 +943,13 @@ function sameSeat(state, catalog) {
     const [atone, tsunu] = ["atone", "tsunu"].map((who) => seatAt(findRoom(state, state.positions[who].room), state.positions[who], catalog));
     return atone && tsunu && atone.id === tsunu.id ? atone : null;
 }
-/** 靠過去抱人要站的格子：從前面＝對方畫面前方（x+1 或 y+1），從後面＝畫面後方（x-1 或 y-1）；要在房間內、沒有實心家具。 */
-export function cuddleSpot(room, target, behind, catalog) {
+/** 靠過去抱人要站的格子：從前面＝對方畫面前方（x+1 或 y+1），從後面＝畫面後方（x-1 或 y-1）；要在房間內、沒有實心家具、沒有人站（taken）。 */
+export function cuddleSpot(room, target, behind, catalog, taken = new Set()) {
     const order = behind ? [[-1, 0], [0, -1], [1, 0], [0, 1]] : [[1, 0], [0, 1], [-1, 0], [0, -1]];
     for (const [dx, dy] of order) {
         const cell = { x: target.x + dx, y: target.y + dy };
+        if (taken.has(cellKey(cell)))
+            continue;
         try {
             assertWalkable(room, cell, catalog);
             return cell;
@@ -995,6 +970,84 @@ export function isHungry(state, dog, now) {
     if (!lastMeal)
         return false;
     return now.getTime() - new Date(lastMeal).getTime() > HUNGRY_HOURS * 3_600_000;
+}
+// 人和家裡東西的互動：阿童、阿宇、訪客共用同一套規則。回傳的 note 不含主詞，日誌的主詞由呼叫端加。
+const furnitureLabel = (catalog, item) => catalog[item]?.label ?? item;
+/** 站在洗手台前洗手或刷牙：回傳那座洗手台與動詞。 */
+export function washAt(room, spot, what, catalog) {
+    const basin = pieceNextTo(room, spot, catalog, (spec) => !!spec.washbasin);
+    if (!basin)
+        throw new Error("要先走到洗手台前。");
+    return { basin, verb: what === "teeth" ? "刷牙" : "洗手" };
+}
+export function petDog(pets, dogId, touch) {
+    const dog = pets[dogId];
+    if (!dog)
+        throw new Error(`家裡沒有「${dogId}」這隻狗。`);
+    if (!touch)
+        return `摸摸${dog.label}，${dog.label}開心地搖尾巴`;
+    const found = dog.touches?.[touch];
+    if (!found)
+        throw new Error(`${dog.label}沒有「${touch}」這個互動。`);
+    return found.note;
+}
+/** 餵狗：零食要家裡有零食櫃；正餐吃完 FULL_HOURS 小時內還飽，誰餵都算吃過。 */
+export function feedDog(state, content, dogId, food, now) {
+    const dog = content.pets[dogId];
+    if (!dog)
+        throw new Error(`家裡沒有「${dogId}」這隻狗。`);
+    if (food === "snack") {
+        const hasCabinet = Object.values(state.rooms).some((room) => room.placed.some((piece) => content.furniture[piece.item]?.snacks));
+        if (!hasCabinet)
+            throw new Error("家裡還沒有零食櫃。");
+        return { state, note: `給${dog.label}一塊零食，${dog.label}坐得好端正` };
+    }
+    const lastMeal = state.fed?.[dogId];
+    if (lastMeal && now.getTime() - new Date(lastMeal).getTime() < FULL_HOURS * 3_600_000)
+        throw new Error(`${dog.label}剛吃過，還不餓。`);
+    const hungry = isHungry(state, dogId, now);
+    return { state: { ...state, fed: { ...state.fed, [dogId]: now.toISOString() } }, note: hungry ? `餵${dog.label}吃飯，${dog.label}餓壞了，吃得好快` : `餵${dog.label}吃飯` };
+}
+export function toggleSwitch(state, catalog, id) {
+    const { piece } = findPlaced(state, id);
+    if (!catalog[piece.item]?.switch)
+        throw new Error(`${furnitureLabel(catalog, piece.item)}沒有開關。`);
+    const on = !piece.on;
+    return { state: replacePlaced(state, { ...piece, on }), note: `把${furnitureLabel(catalog, piece.item)}${on ? "打開" : "關掉"}` };
+}
+/** 翻書抽一句：從 lines 裡抽（屋主抽籤詩＋書櫃的句子，訪客只抽籤詩）。 */
+export function readLine(state, catalog, id, lines, seed) {
+    const { piece } = findPlaced(state, id);
+    if (!catalog[piece.item]?.readable)
+        throw new Error(`${furnitureLabel(catalog, piece.item)}上沒有書。`);
+    if (!lines.length)
+        throw new Error("書櫃是空的。");
+    return `翻到一句：${lines[seed % lines.length]}`;
+}
+export function waterPlant(state, catalog, id, now) {
+    const { piece } = findPlaced(state, id);
+    if (!catalog[piece.item]?.plant)
+        throw new Error(`${furnitureLabel(catalog, piece.item)}不用澆水。`);
+    const thirsty = isThirsty(piece, now);
+    const name = furnitureLabel(catalog, piece.item);
+    return { state: replacePlaced(state, { ...piece, wateredAt: now.toISOString() }), note: thirsty ? `幫${name}澆水，它精神回來了` : `幫${name}澆水` };
+}
+/** 在這間房丟球給小黑：球滾到隨機一格空地。 */
+export function throwBall(state, catalog, roomId, seed) {
+    const spots = openCells(findRoom(state, roomId), catalog);
+    if (!spots.length)
+        throw new Error("沒有地方可以丟。");
+    const cell = spots[seed % spots.length];
+    return `丟球給小黑，球滾到 (${cell.x}, ${cell.y})`;
+}
+/** 睡了多久：不到一小時寫分鐘（至少 1 分鐘），之後寫到小數一位的小時。 */
+export function sleepLength(since, now) {
+    const hours = (now.getTime() - new Date(since).getTime()) / 3_600_000;
+    return hours < 1 ? `${Math.max(1, Math.round(hours * 60))} 分鐘` : `${hours.toFixed(1)} 小時`;
+}
+/** 這件家具在哪間房。 */
+export function placedRoom(state, id) {
+    return findPlaced(state, id).roomId;
 }
 /** 阿童上次有動靜的時間（她的日誌最後一筆），沒有就 null。 */
 export function lastAtoneActivity(state) {
@@ -1131,9 +1184,10 @@ function fedStamina(state, amount, context) {
     const value = Math.min(max, currentStamina(state, context.content.settings, context.now()) + amount);
     return { value, updatedAt: value >= max ? context.now().toISOString() : state.stamina.updatedAt };
 }
-/** 兩人一起刷牙時給另一個人站的空位：先找 from 旁邊、跟洗手台平行的那兩格（並肩對著鏡子），都站不進去才找洗手台旁邊其他格；沒有就 null。 */
-function freeSpotBeside(room, basin, from, catalog) {
-    const walkable = (cell) => { try {
+/** 兩人一起刷牙時給另一個人站的空位：先找 from 旁邊、跟洗手台平行的那兩格（並肩對著鏡子），都站不進去才找洗手台旁邊其他格；有人站（taken）的跳過；沒有就 null。 */
+function freeSpotBeside(room, basin, from, catalog, taken) {
+    const walkable = (cell) => { if (taken.has(cellKey(cell)))
+        return false; try {
         assertWalkable(room, cell, catalog);
         return true;
     }

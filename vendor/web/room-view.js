@@ -39,6 +39,8 @@ const SEATED_ANIMS = new Set(["sit", "lounge", "sleep", "sleep_hug", "shower"]);
 const seated = (who) => SEATED_ANIMS.has(who.anim);
 const lying = (who) => who.anim === "sleep" || who.anim === "sleep_hug";
 const LOWER_LEG = /^(lower_leg|foot)_/;   // 小腿與腳掌的骨頭
+const parseCell = (key) => { const [x, y] = key.split(",").map(Number); return { x, y }; };
+const besideCells = ({ x, y }) => [{ x: x + 1, y }, { x: x - 1, y }, { x, y: y + 1 }, { x, y: y - 1 }];
 
 /** 鏡中影像面向哪裡 (dx, dy)：本人的面向（face 的反推）對鏡面反射，後牆鏡子（y=0）反 y、左牆鏡子（x=0）反 x；正面朝鏡頭的人，鏡子照到的是背面。 */
 function mirroredFacing({ view, flip }, wall) {
@@ -245,7 +247,8 @@ export class RoomView {
           const onBed = seatPose === "lounge";
           character.bathing = seatPose === "bathe";   // 泡澡：背影坐進浴缸，只露出頭和肩膀
           character.showering = seatPose === "shower";   // 淋浴：站在淋浴盤上洗頭，霧面玻璃擋住身體
-          const asleep = this.sleeping && onBed && (!this.sleepAlone || this.sleepAlone === character.name);   // 一個人睡時，另一個坐上床只是坐著
+          const hostAsleep = this.sleeping && !character.visitor && (!this.sleepAlone || this.sleepAlone === character.name);   // 屋主一個人睡時，另一個坐上床只是坐著
+          const asleep = onBed && (hostAsleep || character.asleep);   // 訪客各自睡：角色帶 asleep
           character.anim = asleep ? (this.sleepCuddler === character.name ? "sleep_hug" : "sleep") : character.bathing ? "sit" : seatPose;
           const away = this.facesAway(seat) || character.bathing;   // 背對鏡頭的椅子與浴缸：坐上去是背影，朝左上＝沿 −x、朝右上＝沿 −y
           character.view = lying(character) || away ? "back34" : "front34";   // 睡覺背對鏡頭側睡，不用畫閉眼
@@ -523,7 +526,7 @@ export class RoomView {
 
   /** 有人躺在這張床上睡覺、床也有被子層：被子要蓋到人身上。 */
   sleepingIn(piece) {
-    return !!this.catalog[piece.item]?.blanket && this.sleeping && this.characters.some((who) => lying(who) && this.seatAt(who.pos)?.id === piece.id);
+    return !!this.catalog[piece.item]?.blanket && this.characters.some((who) => lying(who) && this.seatAt(who.pos)?.id === piece.id);   // 躺著睡的人（屋主或訪客）蓋被子
   }
 
   /** 床圖（換過色就用染好的）只留被子那一塊：用被子層的形狀裁出來。 */
@@ -641,6 +644,25 @@ export class RoomView {
     const cells = [];
     for (let dx = 0; dx < w; dx++) for (let dy = 0; dy < d; dy++) cells.push(`${piece.x + dx},${piece.y + dy}`);
     return cells;
+  }
+
+  /** 家具（洗手台、爐台）旁邊站得進去的格子裡離 from 最近的那格；from 已經緊鄰它就是 from 自己；沒有就 null。 */
+  spotBeside(piece, from) {
+    const cells = this.cellsOf(piece).map(parseCell);
+    if (cells.some((cell) => Math.abs(cell.x - from.x) + Math.abs(cell.y - from.y) === 1)) return from;
+    const blocked = new Set(this.home.placed.filter((p) => !this.catalog[p.item]?.floor && !this.catalog[p.item]?.seat && !this.catalog[p.item]?.onWall).flatMap((p) => this.cellsOf(p)));
+    const open = cells.flatMap(besideCells).filter((cell) => this.inRoom(cell) && !blocked.has(`${cell.x},${cell.y}`));
+    return open.sort((a, b) => Math.hypot(a.x - from.x, a.y - from.y) - Math.hypot(b.x - from.x, b.y - from.y))[0] ?? null;
+  }
+
+  /** 從 cell 看過去、緊鄰的那格洗手台在哪個方向（{dx, dy}）；旁邊沒有洗手台就 null。 */
+  basinDirection(cell) {
+    for (const piece of this.home.placed.filter((p) => this.catalog[p.item]?.washbasin)) {
+      for (const { x, y } of this.cellsOf(piece).map(parseCell)) {
+        if (Math.abs(x - cell.x) + Math.abs(y - cell.y) === 1) return { dx: x - cell.x, dy: y - cell.y };
+      }
+    }
+    return null;
   }
 
   /** 這一格上可坐的家具（沙發、床），沒有就 null。 */
