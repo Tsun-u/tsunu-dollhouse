@@ -346,7 +346,7 @@ export class House {
       return chip;
     };
     $("giveChoices").replaceChildren(
-      ...Object.entries(game.state.products).filter(([chain]) => !content.recipes[chain]?.clothes).map(([chain, n]) => give(   // 衣服不能吃，收進衣櫃另外處理`遞一份${content.recipes[chain]?.tiers.at(-1) ?? chain}`, n, { kind: "give", product: chain, to: target.name })),
+      ...Object.entries(game.state.products).filter(([chain]) => !content.recipes[chain]?.clothes).map(([chain, n]) => give(`遞一份${content.recipes[chain]?.tiers.at(-1) ?? chain}`, n, { kind: "give", product: chain, to: target.name })),   // 衣服不能吃，收進衣櫃另外處理
       ...Object.entries(game.state.dishes ?? {}).filter(([, n]) => n > 0).map(([dish, n]) => give(`遞一份${content.dishes[dish]?.label ?? dish}`, n, { kind: "give", dish, to: target.name })),
     );
     if (!$("giveChoices").children.length) $("giveChoices").textContent = "家裡沒有可以遞的東西，去工坊做或爐台煮。";
