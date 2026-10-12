@@ -235,6 +235,15 @@ button:disabled { background: var(--line); color: var(--muted); cursor: default;
 .cell-icon { width: 70%; aspect-ratio: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
 .cell .tier { font-size: 11px; font-weight: 600; }
 
+#tablePanel { margin-top: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px; }
+#tablePanel[hidden] { display: none; }
+#noteForm { display: flex; gap: 6px; margin-top: 6px; }
+#noteForm input { flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 15px; background: #fff; color: var(--ink); }
+#giveChoices { margin-top: 6px; }
+#journalBox { margin-top: 12px; font-size: 13px; color: var(--muted); }
+#journalBox summary { cursor: pointer; }
+#journal { max-height: 160px; overflow-y: auto; border-top: 1px solid var(--line); margin-top: 6px; padding-top: 6px; }
+#journal p { margin: 2px 0; }
 #dogPanel, #dollPanel { margin-top: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px; }
 #closetBody { display: grid; grid-template-columns: minmax(180px, 300px) 1fr; gap: 16px; align-items: start; }
 #closetCanvas { width: 100%; aspect-ratio: 2 / 3; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }

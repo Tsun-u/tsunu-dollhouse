@@ -68,9 +68,29 @@ const house = new House({
   updateDoll: (id, changes) => setDolls({ ...dollsSave, dolls: updateDoll(dollsSave.dolls, id, changes) }),
   select: (id) => setDolls({ ...dollsSave, selected: id }),
   apply,
+  icons: () => icons,
 });
 
 const icons = new IconSheet(content.recipes, () => renderAll());
+
+/** 家常菜的圖（畫在房間的桌上）：第一次要用時才載，載好重畫房間。 */
+const dishImages = new Map();
+function dishImage(dish) {
+  if (!dishImages.has(dish)) {
+    const image = new Image();
+    image.onload = () => house.room.draw();
+    if (content.dishes[dish]?.image) image.src = content.dishes[dish].image;
+    dishImages.set(dish, image);
+  }
+  return dishImages.get(dish);
+}
+house.room.drawTableIcon = (ctx, item, x, y, size) => {   // 桌上的商品、家常菜畫成縮圖；紙條沒有圖，交給房間畫小圓點
+  if (item.kind === "product") { icons.drawIcon(ctx, item.chain, (content.recipes[item.chain]?.tiers.length ?? 1) - 1, x, y, size); return true; }
+  const image = item.kind === "dish" ? dishImage(item.dish) : null;
+  if (!image?.naturalWidth) return false;
+  ctx.drawImage(image, x, y, size, size);
+  return true;
+};
 const puzzle = new PuzzleView($("board"), $("puzzleInfo"), $("puzzleStart"), icons, apply, content.settings.stamina, () => $("puzzleShop").value || undefined);
 const workshop = new WorkshopView({ materials: $("materials"), grid: $("grid"), products: $("products") }, content.recipes, icons, apply);
 const guests = Object.entries(BODIES).map(([body, spec]) => ({ body, views: { front: skeletons[spec.views.front], front34: skeletons[spec.views.front34], back34: skeletons[spec.views.back34] } }));

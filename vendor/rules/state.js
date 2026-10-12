@@ -284,6 +284,17 @@ function reduce(state, action, context) {
         case "give": {
             if (context.actor === "game")
                 throw new Error("小屋自己不遞東西。");
+            if (context.doer && action.to) { // 兒童版：遞給同一間房的另一個娃娃，她當場吃掉（跟遞給阿童一樣回體力）
+                if (action.dish) {
+                    const dish = context.content.dishes[action.dish];
+                    if (!dish || (state.dishes[action.dish] ?? 0) < 1)
+                        throw new Error(`沒有${dish?.label ?? action.dish}可以遞。`);
+                    return { state: { ...state, dishes: adjust(state.dishes, action.dish, -1), stamina: fedStamina(state, dish.stamina, context) }, note: `遞給${action.to}一份${dish.label}`, to: action.to };
+                }
+                if (!action.product || (state.products[action.product] ?? 0) < 1)
+                    throw new Error(`沒有${action.product ? productLabel(action.product) : "東西"}可以遞。`);
+                return { state: { ...state, products: adjust(state.products, action.product, -1), stamina: fedStamina(state, 1, context) }, note: `遞給${action.to}一份${productLabel(action.product)}`, to: action.to };
+            }
             if (action.to && action.to !== "atone" && action.to !== "tsunu") { // 遞給客人：從家裡的庫存拿一份到他手上
                 const guest = state.visitors?.[action.to];
                 if (!guest)

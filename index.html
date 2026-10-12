@@ -48,13 +48,21 @@
     <div id="dollPanel" hidden>
       <div class="panel-head"><span id="dollPanelTitle"></span></div>
       <div id="dollActions" class="chips"></div>
+      <div id="giveChoices" class="chips" hidden></div>
     </div>
     <div id="dogPanel" hidden>
       <div class="panel-head"><span id="dogTitle"></span><button id="dogClose">收起</button></div>
       <div id="dogActions" class="chips"></div>
     </div>
+    <div id="tablePanel" hidden>
+      <div class="panel-head"><span id="tableTitle"></span><button id="tableClose">收起</button></div>
+      <div id="tableItems" class="chips"></div>
+      <div id="tablePut" class="chips"></div>
+      <form id="noteForm"><input id="noteInput" type="text" maxlength="200" placeholder="留一張紙條…" autocomplete="off"><button type="submit">放</button></form>
+    </div>
     <div class="panel-head"><span>倉庫（點一下家具，再點房間的地板放下去）</span></div>
     <div id="inventory" class="chips"></div>
+    <details id="journalBox"><summary>最近發生的事</summary><div id="journal"></div></details>
   </section>
 
   <section id="closet" class="tab">

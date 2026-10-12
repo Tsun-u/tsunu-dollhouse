@@ -2,7 +2,7 @@
 // 畫面跟著「目前選取的娃娃」在哪一間房；同一間房的娃娃都畫出來。
 
 import { BODIES, CLOTHES_COLORS, headParts } from "../vendor/rules/looks.js";
-import { cuddleSpot, openCells, pillowSpot, seatAt } from "../vendor/rules/state.js";
+import { cuddleSpot, openCells, pillowSpot, seatAt, tableFreshness } from "../vendor/rules/state.js";
 import { createGestures } from "../vendor/web/gestures.js";
 import { Pets } from "../vendor/web/pets.js";
 import { RoomView } from "../vendor/web/room-view.js";
@@ -14,7 +14,7 @@ const button = (label, onclick, className = "item") => Object.assign(document.cr
 
 export class House {
   /**
-   * @param deps { game, content, skeletons, animations, samplePose, dressUp, dolls: () => dollsSave, updateDoll(id, changes), select(id), apply(action, doer) → 新寫的日誌或 null }
+   * @param deps { game, content, skeletons, animations, samplePose, dressUp, dolls: () => dollsSave, updateDoll(id, changes), select(id), apply(action, doer) → 新寫的日誌或 null, icons: () => 圖示表 }
    */
   constructor(deps) {
     this.deps = deps;
@@ -25,6 +25,8 @@ export class House {
     this.sleepingOn = null;    // 一起睡的那張床的 id；有人起來就結束
     this.dogOpen = null;
     this.paintingId = null;    // 打開布面色盤的那件家具
+    this.tableOpen = null;     // 打開置物面板的那張桌子
+    this.givingTo = null;      // 正在挑要遞什麼給她的那個娃娃
     const { content } = deps;
     this.room = new RoomView($("room"), content.furniture, {
       onCellTap: (cell) => this.tapCell(cell),
@@ -41,6 +43,14 @@ export class House {
     $("flipBtn").onclick = () => this.selectedPiece && deps.apply({ kind: "flip", id: this.selectedPiece });
     $("storeBtn").onclick = () => { if (this.selectedPiece) { deps.apply({ kind: "store", id: this.selectedPiece }); this.selectPiece(null); } };
     $("dogClose").onclick = () => { this.dogOpen = null; this.renderDog(); };
+    $("tableClose").onclick = () => { this.tableOpen = null; this.renderTable(); };
+    $("noteForm").onsubmit = (e) => {
+      e.preventDefault();
+      const note = $("noteInput").value.trim();
+      if (!note || !this.tableOpen) return;
+      $("noteInput").value = "";
+      this.act({ kind: "put_on_table", id: this.tableOpen, note });
+    };
   }
 
   get selectedDoll() {
@@ -97,6 +107,8 @@ export class House {
     this.renderPieceActions();
     this.renderDollActions();
     this.renderDog();
+    this.renderTable();
+    this.renderJournal();
   }
 
   /** 娃娃換位置：寫進娃娃存檔；走動就醒了，有人起來也不算一起睡了。 */
@@ -284,6 +296,7 @@ export class House {
       if (spec?.bowl) actions.push(button(`倒飼料給${pet.label}`, () => this.act({ kind: "feed", dog, food: "meal" }), ""));
       if (spec?.snacks) actions.push(button(`拿零食給${pet.label}`, () => this.act({ kind: "feed", dog, food: "snack" }), ""));
     }
+    if (spec?.table) actions.push(button("打開桌面", () => { this.tableOpen = piece.id; this.renderTable(); }, ""));
     if (spec?.dye) actions.push(button(this.paintingId === piece.id ? "收起顏色" : "換顏色", () => { this.paintingId = this.paintingId === piece.id ? null : piece.id; this.renderPieceActions(); }, ""));
     $("pieceActions").replaceChildren(...actions);
     const painting = spec?.dye && this.paintingId === piece.id;   // 布面色盤：原色＋衣服的色票＋自訂顏色
@@ -300,6 +313,8 @@ export class House {
     const doll = this.selectedDoll;
     const others = this.deps.dolls().dolls.filter((other) => doll && other.id !== doll.id && other.spot.room === doll.spot.room);
     $("dollPanel").hidden = !others.length;
+    if (!others.some((other) => other.id === this.givingTo)) this.givingTo = null;
+    this.renderGiveChoices(doll, others.find((other) => other.id === this.givingTo));
     if (!others.length) return;
     $("dollPanelTitle").textContent = `${doll.name}可以……`;
     const catalog = this.deps.content.furniture;
@@ -312,8 +327,27 @@ export class House {
       const together = seat && seatOf(doll)?.id === seat.id;
       if (seat && !together && !washing) actions.push(button(`坐到${other.name}旁邊`, () => this.sitBeside(doll, other, seat)));
       if (together && catalog[seat.item]?.seatPose === "lounge" && this.sleepingOn !== seat.id) actions.push(button(`跟${other.name}一起睡`, () => { this.sleepingOn = seat.id; this.render(); }));
+      actions.push(button(`叫${other.name}過來`, () => this.callOver(doll, other)));
+      actions.push(button(this.givingTo === other.id ? "收起" : `遞東西給${other.name}`, () => { this.givingTo = this.givingTo === other.id ? null : other.id; this.renderDollActions(); }));
     }
     $("dollActions").replaceChildren(...actions);
+  }
+
+  /** 遞東西給 target：列出家裡的商品與家常菜，點了就遞過去（她當場吃掉）。 */
+  renderGiveChoices(doll, target) {
+    $("giveChoices").hidden = !target;
+    if (!target) return;
+    const { content, game } = this.deps;
+    const give = (label, count, action) => {
+      const chip = button(label, () => this.act(action, doll));
+      chip.append(Object.assign(document.createElement("span"), { className: "count", textContent: `×${count}` }));
+      return chip;
+    };
+    $("giveChoices").replaceChildren(
+      ...Object.entries(game.state.products).map(([chain, n]) => give(`遞一份${content.recipes[chain]?.tiers.at(-1) ?? chain}`, n, { kind: "give", product: chain, to: target.name })),
+      ...Object.entries(game.state.dishes ?? {}).filter(([, n]) => n > 0).map(([dish, n]) => give(`遞一份${content.dishes[dish]?.label ?? dish}`, n, { kind: "give", dish, to: target.name })),
+    );
+    if (!$("giveChoices").children.length) $("giveChoices").textContent = "家裡沒有可以遞的東西，去工坊做或爐台煮。";
   }
 
   wave(id) {
@@ -361,5 +395,56 @@ export class House {
       ...Object.entries(pets[dog]?.touches ?? {}).map(([touch, spec]) => button(spec.label, () => this.act({ kind: "pet", dog, touch }))),
       ...(dog === "black" ? [button("丟球", () => this.act({ kind: "throw_ball" }))] : []),
     );
+  }
+
+  /** 桌上的東西（點了拿走，家常菜是吃掉；寫是哪個娃娃放的）與可以放上去的商品、家常菜；一張桌子最多 3 樣。 */
+  renderTable() {
+    const piece = this.tableOpen && this.room.home?.placed.find((p) => p.id === this.tableOpen);
+    $("tablePanel").hidden = !piece;
+    if (!piece) return;
+    const { content, game } = this.deps;
+    const icons = this.deps.icons();
+    const items = piece.items ?? [];
+    $("tableTitle").textContent = `${content.furniture[piece.item].label}上（${items.length}/3）`;
+    const productIcon = (chain) => { const icon = Object.assign(document.createElement("span"), { className: "icon" }); icons.apply(icon, chain, (content.recipes[chain]?.tiers.length ?? 1) - 1); return icon; };
+    const dishIcon = (dish) => Object.assign(document.createElement("img"), { className: "icon", src: content.dishes[dish]?.image ?? "", alt: "" });
+    $("tableItems").replaceChildren(...items.map((item, index) => {
+      const chip = button("", () => this.act({ kind: "take_from_table", id: piece.id, index }));
+      const who = item.name ?? "有人";
+      if (item.kind === "note") chip.textContent = `${who}的紙條：${item.text}`;
+      else if (item.kind === "dish") chip.append(dishIcon(item.dish), `${who}煮的${item.text}（點一下吃掉）`);
+      else chip.append(productIcon(item.chain), `${who}放的${content.recipes[item.chain]?.tiers.at(-1) ?? item.chain}（${tableFreshness(content.recipes[item.chain], item.at, new Date()).label}）`);
+      chip.title = "點一下拿走";
+      return chip;
+    }));
+    if (!items.length) $("tableItems").textContent = "桌上空空的。";
+    const count = (n) => Object.assign(document.createElement("span"), { className: "count", textContent: `×${n}` });
+    const put = (children, action) => {
+      const chip = button("", () => this.act(action));
+      chip.append(...children);
+      chip.disabled = items.length >= 3;
+      return chip;
+    };
+    $("tablePut").replaceChildren(
+      ...Object.entries(game.state.products).map(([chain, n]) => put([productIcon(chain), `放一份${content.recipes[chain]?.tiers.at(-1) ?? chain}`, count(n)], { kind: "put_on_table", id: piece.id, product: chain })),
+      ...Object.entries(game.state.dishes ?? {}).filter(([, n]) => n > 0).map(([dish, n]) => put([dishIcon(dish), `端一份${content.dishes[dish]?.label ?? dish}上桌`, count(n)], { kind: "put_on_table", id: piece.id, dish })),
+    );
+  }
+
+  /** 最近發生的事：娃娃做的寫她的名字，店裡自己發生的寫「店裡」，其他（買東西、佈置）不寫主詞。 */
+  renderJournal() {
+    const time = (at) => new Date(at).toLocaleString("zh-TW", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+    $("journal").replaceChildren(...this.deps.game.state.journal.slice(-30).reverse().map((entry) => {
+      const who = entry.who ?? (entry.actor === "game" ? "店裡" : "");
+      return Object.assign(document.createElement("p"), { textContent: `${time(entry.at)} ${who ? `${who}：` : ""}${entry.text}` });
+    }));
+    if (!$("journal").children.length) $("journal").textContent = "還沒有發生什麼事。";
+  }
+
+  /** 叫同一間房的娃娃過來：她走到選取的娃娃面前（跟抱抱同一個站位），站不下就到附近最近的空格。 */
+  callOver(doll, other) {
+    const front = cuddleSpot(this.room.home, doll.spot, false, this.deps.content.furniture);
+    const spot = front && this.standable(front, other.id) ? { room: this.roomId, ...front } : this.freeSpotNear(doll.spot);
+    this.moveDoll(other.id, { room: this.roomId, x: spot.x, y: spot.y });
   }
 }
