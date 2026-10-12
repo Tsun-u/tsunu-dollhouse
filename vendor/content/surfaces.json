@@ -1,0 +1,107 @@
+{
+ "floors": {
+  "tile": {
+   "label": "米色磁磚",
+   "price": 0,
+   "pattern": "checker",
+   "colors": [
+    "#e3cfb0",
+    "#d9c2a0"
+   ],
+   "line": "#cdb593"
+  },
+  "wood": {
+   "label": "木地板",
+   "price": 400,
+   "pattern": "planks",
+   "colors": [
+    "#c8925b",
+    "#bb8650",
+    "#d19d66"
+   ],
+   "line": "#9a6a3d"
+  },
+  "wood_light": {
+   "label": "淺色木地板",
+   "price": 400,
+   "pattern": "planks",
+   "colors": [
+    "#e3c395",
+    "#d8b784",
+    "#ebd0a7"
+   ],
+   "line": "#b8935f"
+  },
+  "tile_mint": {
+   "label": "薄荷磁磚",
+   "price": 300,
+   "pattern": "checker",
+   "colors": [
+    "#dcefe6",
+    "#cbe4d8"
+   ],
+   "line": "#a9cbbb"
+  },
+  "tile_chess": {
+   "label": "西洋棋盤格",
+   "price": 400,
+   "pattern": "checker",
+   "colors": [
+    "#3b3836",
+    "#efe8da"
+   ],
+   "line": "#8a8279"
+  }
+ },
+ "walls": {
+  "plain": {
+   "label": "米色素牆",
+   "price": 0,
+   "pattern": "plain",
+   "colors": [
+    "#e9dcc4",
+    "#f4e9d3"
+   ]
+  },
+  "stripe_sage": {
+   "label": "鼠尾草綠條紋",
+   "price": 300,
+   "pattern": "stripes",
+   "colors": [
+    "#e4e6d6",
+    "#eff1e3"
+   ],
+   "accent": "#bfd0b3"
+  },
+  "dots_rose": {
+   "label": "乾燥玫瑰點點",
+   "price": 300,
+   "pattern": "dots",
+   "colors": [
+    "#efdcd6",
+    "#f7e8e3"
+   ],
+   "accent": "#d9a3a3"
+  },
+  "wainscot": {
+   "label": "木腰板",
+   "price": 450,
+   "pattern": "wainscot",
+   "colors": [
+    "#ebe0cb",
+    "#f5ecda"
+   ],
+   "accent": "#c49a60"
+  },
+  "white_baseboard": {
+   "label": "白牆＋咖啡色踢腳板",
+   "price": 300,
+   "pattern": "baseboard",
+   "colors": [
+    "#f1eee7",
+    "#f8f6f1"
+   ],
+   "accent": "#86593a"
+  }
+ }
+}

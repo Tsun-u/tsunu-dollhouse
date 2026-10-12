@@ -34,6 +34,14 @@ test("不合法的動作丟錯，存檔不變", () => {
   assert.equal(storage.getItem(GAME_KEY), before);
 });
 
+test("帶上娃娃（doer）的動作，日誌記她的名字", () => {
+  const game = createGame(content, memoryStorage());
+  game.apply({ kind: "wave" }, { name: "小花", spot: { room: "bedroom", x: 1, y: 1 } });
+  assert.equal(game.state.journal.at(-1).who, "小花");
+  game.apply({ kind: "wave" });
+  assert.equal(game.state.journal.at(-1).who, undefined);
+});
+
 test("訂閱者在每次成功的動作後收到新狀態", () => {
   const game = createGame(content, memoryStorage());
   const seen = [];

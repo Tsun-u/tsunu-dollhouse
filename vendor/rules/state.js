@@ -82,9 +82,9 @@ export function createBedroom(placed, width = 8, depth = 8) {
 export function applyAction(state, action, context) {
     const { state: next, note, tier, chain, earned, to } = reduce(state, action, context);
     const quiet = (tier ?? (DIGEST_KINDS.has(action.kind) ? "digest" : "live")) === "digest";
-    const entry = { at: context.now().toISOString(), actor: context.actor, text: note ?? "", kind: action.kind, ...(quiet ? { quiet: true } : {}), ...(chain ? { chain } : {}), ...(earned ? { earned } : {}), ...(to ? { to } : {}) };
+    const entry = { at: context.now().toISOString(), actor: context.actor, ...(context.doer ? { who: context.doer.name } : {}), text: note ?? "", kind: action.kind, ...(quiet ? { quiet: true } : {}), ...(chain ? { chain } : {}), ...(earned ? { earned } : {}), ...(to ? { to } : {}) };
     const last = next.journal.at(-1);
-    const repeated = note !== null && TWEAK_KINDS.has(action.kind) && last?.kind === action.kind && last.actor === context.actor && last.text === note
+    const repeated = note !== null && TWEAK_KINDS.has(action.kind) && last?.kind === action.kind && last.actor === context.actor && last.who === entry.who && last.text === note
         && context.now().getTime() - Date.parse(last.at) < TWEAK_WINDOW_MS; // 在調色盤上一格一格試顏色：只留第一筆，不每點一下就記一筆、推一則
     const journal = note === null || repeated ? next.journal : [...next.journal, entry].slice(-JOURNAL_LIMIT);
     return { ...next, revision: state.revision + 1, journal };
@@ -535,7 +535,7 @@ function reduce(state, action, context) {
         case "wash": {
             if (context.actor === "game")
                 throw new Error("小屋自己不刷牙。");
-            const here = state.positions[context.actor];
+            const here = standingSpot(state, context);
             const room = findRoom(state, here.room);
             const { basin, verb } = washAt(room, here, action.what, furniture);
             if (!action.together)
@@ -557,7 +557,7 @@ function reduce(state, action, context) {
             const dish = context.content.dishes[action.dish];
             if (!dish)
                 throw new Error(`不會煮「${action.dish}」。`);
-            const here = state.positions[context.actor];
+            const here = standingSpot(state, context);
             if (!pieceNextTo(findRoom(state, here.room), here, furniture, (spec) => !!spec.stove))
                 throw new Error("要先走到爐台前。");
             const missing = Object.entries(dish.ingredients).filter(([chain, need]) => (state.materials[chain] ?? 0) < need);
@@ -616,14 +616,14 @@ function reduce(state, action, context) {
             if (action.product) {
                 if ((state.products[action.product] ?? 0) < 1)
                     throw new Error(`沒有${productLabel(action.product)}可以放。`);
-                const item = { kind: "product", chain: action.product, by: context.actor, at };
+                const item = { kind: "product", chain: action.product, ...placedBy(context), at };
                 return { state: putOnTable({ ...state, products: adjust(state.products, action.product, -1) }, furniture, action.id, item), note: `把一份${productLabel(action.product)}放在${label(piece.item)}上` };
             }
             if (action.dish) {
                 const dish = context.content.dishes[action.dish];
                 if (!dish || (state.dishes[action.dish] ?? 0) < 1)
                     throw new Error(`沒有${dish?.label ?? action.dish}可以放。`);
-                const item = { kind: "dish", dish: action.dish, text: dish.label, by: context.actor, at };
+                const item = { kind: "dish", dish: action.dish, text: dish.label, ...placedBy(context), at };
                 return { state: putOnTable({ ...state, dishes: adjust(state.dishes, action.dish, -1) }, furniture, action.id, item), note: `把一份${dish.label}端到${label(piece.item)}上` };
             }
             const text = action.note?.trim() ?? "";
@@ -631,7 +631,7 @@ function reduce(state, action, context) {
                 throw new Error("要放商品或寫一張紙條。");
             if (text.length > NOTE_MAX_LENGTH)
                 throw new Error(`紙條最多 ${NOTE_MAX_LENGTH} 字。`);
-            return { state: putOnTable(state, furniture, action.id, { kind: "note", text, by: context.actor, at }), note: `在${label(piece.item)}上留了一張紙條：${text}` };
+            return { state: putOnTable(state, furniture, action.id, { kind: "note", text, ...placedBy(context), at }), note: `在${label(piece.item)}上留了一張紙條：${text}` };
         }
         case "take_from_table": {
             if (context.actor === "game")
@@ -642,19 +642,20 @@ function reduce(state, action, context) {
             if (!item)
                 throw new Error("桌上沒有這樣東西。");
             const rest = items.filter((_, i) => i !== action.index);
-            const who = item.by === context.actor ? "自己" : ACTOR_NAME[item.by];
+            const mine = item.by === context.actor && item.name === context.doer?.name; // 兒童版同一個 actor 有好幾個娃娃，連名字一起比
+            const who = mine ? "自己" : item.name ?? ACTOR_NAME[item.by];
             if (item.kind === "note")
-                return { state: replacePlaced(state, { ...piece, items: rest }), note: `收起${who}留的紙條：${item.text}`, ...(item.by !== context.actor ? { tier: "live" } : {}) };
+                return { state: replacePlaced(state, { ...piece, items: rest }), note: `收起${who}留的紙條：${item.text}`, ...(!mine ? { tier: "live" } : {}) };
             if (item.kind === "dish") { // 桌上的家常菜拿起來就是吃掉：阿童吃了回體力
                 const dish = context.content.dishes[item.dish];
                 const name = dish?.label ?? item.dish;
                 const stamina = context.actor === "atone" && dish ? fedStamina(state, dish.stamina, context) : state.stamina;
                 const cleared = replacePlaced({ ...state, stamina }, { ...piece, items: rest });
-                return { state: cleared, note: item.by === context.actor ? `吃掉桌上的${name}` : `吃了${who}煮的${name}`, ...(item.by !== context.actor ? { tier: "live" } : {}) };
+                return { state: cleared, note: mine ? `吃掉桌上的${name}` : `吃了${who}煮的${name}`, ...(!mine ? { tier: "live" } : {}) };
             }
             const { fresh, label: freshness } = tableFreshness(recipes[item.chain], item.at, context.now());
             const next = replacePlaced({ ...state, products: adjust(state.products, item.chain, 1) }, { ...piece, items: rest });
-            return { state: next, note: item.by === context.actor ? `把${productLabel(item.chain)}從${label(piece.item)}上拿回來` : `拿了${who}留的${productLabel(item.chain)}${fresh ? `，${freshness}的` : `，已經${freshness}`}`, ...(item.by !== context.actor ? { tier: "live" } : {}) };
+            return { state: next, note: mine ? `把${productLabel(item.chain)}從${label(piece.item)}上拿回來` : `拿了${who}留的${productLabel(item.chain)}${fresh ? `，${freshness}的` : `，已經${freshness}`}`, ...(!mine ? { tier: "live" } : {}) };
         }
         case "hug":
         case "kiss": {
@@ -735,7 +736,7 @@ function reduce(state, action, context) {
         case "throw_ball": {
             if (context.actor === "game")
                 throw new Error("小屋自己不丟球。");
-            return { state, note: throwBall(state, furniture, actorRoom(state, context.actor), context.seed()) };
+            return { state, note: throwBall(state, furniture, standingSpot(state, context).room, context.seed()) };
         }
         case "event": {
             if (context.actor !== "game")
@@ -801,7 +802,7 @@ function reduce(state, action, context) {
         case "decorate_room": {
             if (context.actor === "game")
                 throw new Error("小屋自己不裝潢。");
-            const roomId = action.room ?? state.positions[context.actor].room;
+            const roomId = action.room ?? standingSpot(state, context).room;
             const room = findRoom(state, roomId);
             const { floors, walls } = context.content.surfaces;
             const floor = action.floor === undefined ? undefined : floors[action.floor];
@@ -1379,6 +1380,20 @@ function withRoom(state, roomId, room) {
 /** 動作者現在在哪間房；小屋自己（game）算在臥室。 */
 function actorRoom(state, actor) {
     return actor === "game" ? FIRST_ROOM : state.positions[actor].room;
+}
+/** 做這件事的人站在哪：兒童版看娃娃（doer），小屋看阿童、阿宇的位置。 */
+function standingSpot(state, context) {
+    if (context.doer)
+        return context.doer.spot;
+    if (context.actor === "game")
+        throw new Error("小屋自己沒有站的地方。");
+    return state.positions[context.actor];
+}
+/** 放上桌的東西記誰放的：兒童版多記娃娃名字。 */
+function placedBy(context) {
+    if (context.actor === "game")
+        throw new Error("小屋自己不放東西。");
+    return { by: context.actor, ...(context.doer ? { name: context.doer.name } : {}) };
 }
 /** 日誌裡的房間名：只有一間房時不用講。 */
 function roomNote(state, roomId) {

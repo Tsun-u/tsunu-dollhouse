@@ -1,0 +1,31 @@
+{
+ "danbing": {
+  "label": "蛋餅",
+  "ingredients": {
+   "egg": 1,
+   "flour": 2
+  },
+  "stamina": 1,
+  "image": "assets/items/dishes/danbing.png"
+ },
+ "tonkatsu": {
+  "label": "炸豬排",
+  "ingredients": {
+   "flour": 2,
+   "egg": 1,
+   "rice": 1
+  },
+  "stamina": 2,
+  "image": "assets/items/dishes/tonkatsu.png"
+ },
+ "omurice": {
+  "label": "蛋包飯",
+  "ingredients": {
+   "egg": 2,
+   "rice": 2,
+   "fruit": 1
+  },
+  "stamina": 2,
+  "image": "assets/items/dishes/omurice.png"
+ }
+}

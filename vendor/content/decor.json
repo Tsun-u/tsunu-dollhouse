@@ -1,0 +1,170 @@
+{
+ "spots": {
+  "counter": {
+   "label": "櫃台",
+   "rect": [
+    90,
+    210,
+    210,
+    115
+   ],
+   "price": 800
+  },
+  "feature": {
+   "label": "主角家具",
+   "rect": [
+    560,
+    178,
+    185,
+    152
+   ],
+   "price": 600
+  },
+  "wall": {
+   "label": "牆面",
+   "rect": [
+    330,
+    40,
+    190,
+    130
+   ],
+   "price": 400
+  },
+  "hanging": {
+   "label": "門口吊飾",
+   "rect": [
+    730,
+    0,
+    80,
+    150
+   ],
+   "price": 300
+  }
+ },
+ "themes": {
+  "wood": "木質溫暖",
+  "nordic": "北歐簡約",
+  "taiwan": "台灣古早味"
+ },
+ "shops": {
+  "cafe": {
+   "feature": "桌椅",
+   "wall": "菜單板"
+  },
+  "grocery": {
+   "feature": "貨架",
+   "wall": "招牌"
+  },
+  "boutique": {
+   "feature": "衣架",
+   "wall": "試衣鏡"
+  }
+ },
+ "rects": {
+  "cafe": {
+   "wall": [
+    270,
+    40,
+    190,
+    130
+   ]
+  },
+  "grocery": {
+   "wall": [
+    285,
+    20,
+    215,
+    125
+   ],
+   "feature": [
+    440,
+    178,
+    185,
+    152
+   ],
+   "hanging": [
+    790,
+    0,
+    80,
+    150
+   ]
+  },
+  "boutique": {
+   "wall": [
+    330,
+    15,
+    190,
+    130
+   ],
+   "feature": [
+    470,
+    178,
+    185,
+    152
+   ],
+   "hanging": [
+    700,
+    0,
+    80,
+    150
+   ]
+  }
+ },
+ "texts": {
+  "cafe": {
+   "wall_wood": {
+    "text": "本日推薦",
+    "color": "#f4efe2",
+    "box": [
+     0.07,
+     0.2,
+     0.87,
+     0.57
+    ]
+   },
+   "wall_taiwan": {
+    "text": "本日咖啡",
+    "color": "#f2c14e",
+    "box": [
+     0.44,
+     0.11,
+     0.21,
+     0.77
+    ],
+    "vertical": true
+   }
+  },
+  "grocery": {
+   "wall_wood": {
+    "text": "雜貨",
+    "color": "#5a3b22",
+    "box": [
+     0.1,
+     0.34,
+     0.81,
+     0.47
+    ]
+   },
+   "wall_nordic": {
+    "text": "雜貨",
+    "color": "#6b6f6a",
+    "box": [
+     0.09,
+     0.35,
+     0.84,
+     0.46
+    ]
+   },
+   "wall_taiwan": {
+    "text": "雜貨",
+    "color": "#fff6e8",
+    "box": [
+     0.09,
+     0.33,
+     0.51,
+     0.36
+    ]
+   }
+  }
+ }
+}

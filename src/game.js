@@ -1,11 +1,11 @@
 // 遊戲存檔：錢、材料、商品、家具、房間、三消、工坊、咖啡廳。規則全部交給小屋匯出的 vendor/rules，這裡只負責存讀與通知。
-// 動作一律用 actor "atone" 送：小屋存檔裡的「阿童」在兒童版就是玩家。
+// 動作一律用 actor "atone" 送：小屋存檔裡的「阿童」在兒童版就是玩家；哪個娃娃做的、站在哪，用 doer 告訴規則。
 
 import { restore } from "../vendor/rules/restore.js";
 import { applyAction } from "../vendor/rules/state.js";
 
 export const GAME_KEY = "dollhouse.game";
-const CONTENT_FILES = ["furniture", "recipes", "clothes", "settings", "pets", "fortunes", "rooms"];
+const CONTENT_FILES = ["furniture", "recipes", "clothes", "settings", "pets", "fortunes", "rooms", "dishes", "surfaces", "decor"];
 
 /** 內容表組成規則要的 Content；read(name) 回傳 vendor/content/<name>.json 的內容（瀏覽器用 fetch、測試用 fs）。 */
 export async function loadContent(read) {
@@ -30,9 +30,9 @@ export function createGame(content, storage, clock = () => new Date()) {
   return {
     get state() { return state; },
     get content() { return content; },
-    /** 套用一個動作；不合法會丟錯，狀態與存檔都不變。 */
-    apply(action) {
-      state = applyAction(state, action, context);
+    /** 套用一個動作；不合法會丟錯，狀態與存檔都不變。doer（{ name, spot }）是做這件事的娃娃：日誌記她的名字，洗手、做菜看她站哪。 */
+    apply(action, doer) {
+      state = applyAction(state, action, doer ? { ...context, doer } : context);
       storage.setItem(GAME_KEY, JSON.stringify(state));
       for (const listener of listeners) listener(state);
       return state;
