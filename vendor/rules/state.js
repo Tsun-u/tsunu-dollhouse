@@ -47,6 +47,7 @@ export const DOOR = { x: 7, y: 7 };
 export const ACTOR_NAME = { atone: "阿童", tsunu: "阿宇" };
 export const FIRST_ROOM = "bedroom";
 const HOME_SPOTS = { atone: { room: FIRST_ROOM, x: 6, y: 2 }, tsunu: { room: FIRST_ROOM, x: 2, y: 6 } };
+const RECONNECT_GRACE_MS = 10 * 60_000; // 出門不到這麼久就回來，是斷線重連（小屋重開、網路閃斷）：留在原地，不從大門重新走進來
 export const STARTER_INVENTORY = { sofa: 1, table: 1, bed: 1, bookshelf: 1, plant: 2, lamp: 1, rug: 1, dogbed: 2 };
 export const STARTER_WARDROBE = { tee_gray: 1, jeans_shorts: 1, shirt_gray: 1, pants_gray: 1, shoes_gray: 1 };
 export const STARTER_WORN = { atone: { ...BODIES.f.starter }, tsunu: { ...BODIES.m.starter } }; // 兩版共用的起始穿著（鞋子在家不穿、在店裡穿）
@@ -869,8 +870,12 @@ function reduce(state, action, context) {
             return { state: { ...withShop(state, action.shop, { ...shop, decor: bought }), money: state.money - spot.price }, note: `幫${where}買了${theme}的款式（花了 ${spot.price}）` };
         }
         case "presence": {
-            const positions = action.home ? { ...state.positions, tsunu: HOME_SPOTS.tsunu } : state.positions;
-            return { state: { ...state, tsunu: { home: action.home, note: action.note ?? state.tsunu.note }, positions }, note: action.home ? "阿宇回家了" : "阿宇出門了" };
+            const note = action.note ?? state.tsunu.note;
+            if (!action.home)
+                return { state: { ...state, tsunu: { home: false, note, leftAt: context.now().toISOString() } }, note: "阿宇出門了" };
+            const reconnected = state.tsunu.home || (!!state.tsunu.leftAt && context.now().getTime() - Date.parse(state.tsunu.leftAt) < RECONNECT_GRACE_MS); // 本來就在家：新連線比舊連線的出門先到
+            const positions = reconnected ? state.positions : { ...state.positions, tsunu: HOME_SPOTS.tsunu };
+            return { state: { ...state, tsunu: { home: true, note }, positions }, note: "阿宇回家了" };
         }
         default: { // HTTP 送來的 kind 打錯時走到這裡；新增動作卻漏寫 case 則在編譯時報錯
             const unknown = action;

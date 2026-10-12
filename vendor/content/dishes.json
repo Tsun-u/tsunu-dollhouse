@@ -36,5 +36,13 @@
   },
   "stamina": 2,
   "image": "assets/items/dishes/udon.png"
+ },
+ "gummy": {
+  "label": "小熊軟糖",
+  "ingredients": {
+   "candy": 3
+  },
+  "stamina": 1,
+  "image": "assets/items/dishes/gummy.png"
  }
 }
