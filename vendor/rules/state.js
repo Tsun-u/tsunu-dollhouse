@@ -2,8 +2,8 @@ import { CATEGORY_SLOT, SLOT_LABEL } from "./clothing.js";
 import { BODIES } from "./looks.js";
 import { createBoard, finale, random, swap } from "./match3.js";
 import { createWorkshop, moveOrMerge, putMaterial } from "./workshop.js";
-const JOURNAL_LIMIT = 500;
-const CHAT_LIMIT = 300;
+export const JOURNAL_LIMIT = 500;
+export const CHAT_LIMIT = 300;
 const SHELF_LIMIT = 200;
 export const THIRSTY_DAYS = 3; // 盆栽這麼多天沒澆水就垂下去
 export const DEFAULT_FLOOR = "tile"; // 房間沒換過地板、壁紙時的樣式（content/surfaces.json）
@@ -22,7 +22,7 @@ export function tableFreshness(recipe, placedAt, now) {
 }
 const NOTE_MAX_LENGTH = 200;
 const SHELF_MAX_LENGTH = 120;
-const CHAT_MAX_LENGTH = 500;
+export const CHAT_MAX_LENGTH = 500;
 export const PUZZLE_ROWS = 7;
 export const PUZZLE_COLS = 7;
 export const PUZZLE_MOVES = 20;
@@ -454,6 +454,35 @@ function reduce(state, action, context) {
                 ...(milestone || soldOut ? { tier: "live" } : {}),
             };
         }
+        case "open_door": {
+            if (context.actor === "game")
+                throw new Error("小屋自己不開門。");
+            if (state.door?.open)
+                throw new Error("門已經開著了。");
+            const [atoneSpot, tsunuSpot] = entranceSpots(state, furniture, 2, []); // 開門前清乾淨：兩人都起床、出浴缸，到客廳門口
+            if (!atoneSpot || !tsunuSpot)
+                throw new Error("客廳門口擠不下兩個人，先挪一下家具。");
+            return { state: { ...state, door: { open: true, by: context.actor, at: context.now().toISOString() }, sleeping: null, positions: { atone: atoneSpot, tsunu: tsunuSpot } }, note: "打開門讓客人進來" };
+        }
+        case "close_door": {
+            if (context.actor === "game")
+                throw new Error("小屋自己不關門。");
+            if (!state.door?.open)
+                throw new Error("門本來就關著。");
+            const guests = Object.keys(state.visitors ?? {}).length;
+            return { state: { ...state, door: { open: false, by: context.actor, at: context.now().toISOString() }, visitors: {} }, note: guests ? "關上門，客人都回家了" : "關上門" };
+        }
+        case "say_guests": {
+            if (context.actor === "game")
+                throw new Error("小屋自己不說話。");
+            const text = action.text.trim();
+            if (!text)
+                throw new Error("訊息不可空白。");
+            if (text.length > CHAT_MAX_LENGTH)
+                throw new Error(`一則最多 ${CHAT_MAX_LENGTH} 字。`);
+            const message = { id: context.newId(), at: context.now().toISOString(), speaker: context.actor, name: ACTOR_NAME[context.actor], text };
+            return { state: { ...state, guestChat: [...(state.guestChat ?? []), message].slice(-CHAT_LIMIT) }, note: null };
+        }
         case "journal": {
             if (!action.text.trim())
                 throw new Error("日誌內容不可空白。");
@@ -486,6 +515,8 @@ function reduce(state, action, context) {
             const verb = action.what === "teeth" ? "刷牙" : "洗手";
             if (!action.together)
                 return { state, note: verb };
+            if (state.door?.open)
+                throw new Error(`有客人在，先不要一起${verb}。`);
             const partner = context.actor === "atone" ? "tsunu" : "atone";
             if (partner === "tsunu" && !state.tsunu.home)
                 throw new Error("阿宇不在家。");
@@ -651,6 +682,8 @@ function reduce(state, action, context) {
             const target = context.actor === "atone" ? "tsunu" : "atone";
             if (!state.tsunu.home)
                 throw new Error("阿宇不在家。");
+            if (state.door?.open)
+                throw new Error("有客人在，先不要抱抱、親親。");
             const behind = action.kind === "hug" && action.from === "behind";
             const verb = action.kind === "kiss" ? "親了一下" : behind ? "從後面抱住" : "抱了一下";
             const note = `${verb}${ACTOR_NAME[target]}`;
@@ -690,6 +723,8 @@ function reduce(state, action, context) {
                 throw new Error("已經在睡了。");
             if (state.sleeping && !together)
                 throw new Error(`${ACTOR_NAME[state.sleeping.alone]}在別張床上睡。`);
+            if (together && state.door?.open)
+                throw new Error("有客人在，先不要一起睡。");
             if (together)
                 return { state: { ...state, sleeping: { since: state.sleeping?.since ?? context.now().toISOString() } }, note: state.sleeping ? `躺到${ACTOR_NAME[state.sleeping.alone]}旁邊一起睡了` : "兩個人一起睡了" };
             return { state: { ...state, sleeping: { since: context.now().toISOString(), alone: actor } }, note: `躺在${label(bed.item)}上睡覺了` };
@@ -733,6 +768,10 @@ function reduce(state, action, context) {
             const moved = roomId !== from ? `走到${room.name}` : null;
             const pose = seat ? furniture[seat.item]?.seatPose : undefined;
             const together = pose === "bathe" && other.room === roomId && seatAt(room, other, furniture)?.id === seat.id;
+            if (together && state.door?.open)
+                throw new Error("有客人在，先不要一起泡澡。");
+            if (visitorAt(state, { room: roomId, ...cell }))
+                throw new Error("那裡有客人站著。");
             const sat = !seat ? null
                 : pose === "shower" ? `走進${label(seat.item)}洗澡`
                     : pose === "bathe" ? (together ? `泡進${label(seat.item)}，一起泡澡` : `泡進${label(seat.item)}`)
@@ -854,6 +893,22 @@ function made(state, chain, context) {
     return { state: { ...next, orders }, note: first ? `第一次做出${product}！${progress}` : progress, chain, tier: "live" }; // 做的是對方派的單：對方要知道進度
 }
 /** 房間裡站得了的空格（沒有實心家具、也不是可坐的家具）。 */
+/** 訪客進門的位置：客廳（還沒蓋就第一間房）裡站得進去、不是座位、沒人站的格子，照離第一扇門近到遠排，取 count 格。
+ *  taken 是已經有人站的位置（開門時屋主自己要被挪過去，傳空的）。 */
+export function entranceSpots(state, catalog, count, taken) {
+    const roomId = state.rooms.living ? "living" : FIRST_ROOM;
+    const room = findRoom(state, roomId);
+    const door = room.doors[0];
+    const origin = door ? doorCell(door) : { x: 0, y: 0 };
+    const busy = new Set(taken.filter((spot) => spot.room === roomId).map((spot) => `${spot.x},${spot.y}`));
+    const distance = (cell) => Math.abs(cell.x - origin.x) + Math.abs(cell.y - origin.y);
+    return openCells(room, catalog).filter((cell) => !busy.has(`${cell.x},${cell.y}`))
+        .sort((a, b) => distance(a) - distance(b)).slice(0, count).map((cell) => ({ room: roomId, ...cell }));
+}
+/** 這一格站著哪位訪客（id），沒有就 null。 */
+export function visitorAt(state, spot) {
+    return Object.entries(state.visitors ?? {}).find(([, visitor]) => visitor.spot.room === spot.room && visitor.spot.x === spot.x && visitor.spot.y === spot.y)?.[0] ?? null;
+}
 export function openCells(room, catalog) {
     const cells = [];
     for (let x = 0; x < room.width; x++)
@@ -1092,7 +1147,7 @@ function freeSpotBeside(room, basin, from, catalog) {
     return [...shoulder, ...aside].find(walkable) ?? null;
 }
 /** 走得進去的格子：空地、地毯上、可坐的家具上。 */
-function assertWalkable(room, cell, catalog) {
+export function assertWalkable(room, cell, catalog) {
     if (!Number.isInteger(cell.x) || !Number.isInteger(cell.y))
         throw new Error("座標必須是整數格。");
     if (cell.x < 0 || cell.y < 0 || cell.x >= room.width || cell.y >= room.depth)
@@ -1132,7 +1187,7 @@ function replacePlaced(state, piece) {
     const room = state.rooms[roomId];
     return withRoom(state, roomId, { ...room, placed: room.placed.map((p) => (p.id === piece.id ? piece : p)) });
 }
-function findRoom(state, roomId) {
+export function findRoom(state, roomId) {
     const room = state.rooms[roomId];
     if (!room)
         throw new Error(`家裡還沒有「${roomId}」這間房。`);

@@ -282,13 +282,25 @@ export class Skeleton {
    *  underwear：false 就連內衣也不畫（泡澡）。
    *  layer："behind" 只畫皮膚底下的零件（後髮），"front" 不畫它們；沒給就全畫。從後面抱時被抱的人的後髮要塞到抱人的身體後面。
    *  灰稿素體沒有輪廓線，整個人（或 only 拆出來的那幾根）畫好後在最外圈補一道外框（OUTLINE_COLOR）。 */
+  /** memo（呼叫端每個人一份）＋poseTolerance：同一個人衣服、縮放、面向都沒變，姿勢跟上次畫的差不到 poseTolerance
+   *  （角度幾度、位移幾個骨架單位）時，直接貼上次畫好的人像（含外框、交疊線），人移動了就平移過去貼。
+   *  站、坐、躺的呼吸起伏不到 1 px，重用看不出差別；畫一個人要疊十幾次圖，同一間房人多時靠這個省下大半。
+   *  看姿勢不看時間：畫面越慢越該重用，不能因為一幀太久就全部重畫。回傳這次有沒有真的重畫（false＝貼了上次的人像）。 */
   draw(ctx, pose, options = {}) {
-    if (!this.data.skinGray) { this.drawParts(ctx, pose, options); return; }
-    const { x = 0, y = 0, scale = 1, facing = 1 } = options;
+    if (!this.data.skinGray) { this.drawParts(ctx, pose, options); return true; }
+    const { x = 0, y = 0, scale = 1, facing = 1, memo = null, poseTolerance = 0 } = options;
+    const m = ctx.getTransform();
+    const origin = [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f];   // 這次畫在畫面上的哪裡（人像本身跟位置無關）
+    const inputs = memo && [this, scale, facing, m.a, m.b, m.c, m.d, options.outfits, options.skin, options.bodyTint, options.only, options.layer, options.underwear];
+    if (memo?.canvas && poseTolerance > 0 && inputs.every((value, i) => value === memo.inputs[i]) && posesClose(pose, memo.pose, poseTolerance)) {
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(memo.canvas, memo.left + origin[0] - memo.origin[0], memo.upper + origin[1] - memo.origin[1]);
+      ctx.restore();
+      return false;
+    }
     const { w: canvasW, h: canvasH } = this.data.canvas;
     const build = this.data.scale ?? 1;
     const centerX = x + (facing * canvasW * scale) / 2, footY = y + canvasH * scale;
-    const m = ctx.getTransform();
     const width = Math.max(1, Math.hypot(m.a, m.b) * OUTLINE_WIDTH);   // 外框在畫面上的寬度（跟著人物的縮放）
     const toScreen = ([cx, cy]) => m.transformPoint(new DOMPoint(centerX + (cx - canvasW / 2) * scale * facing * build, footY + (cy - canvasH) * scale * build));
     // 暫存畫布涵蓋整張骨架畫布，加上擺好姿勢後伸出畫布的皮膚（靠坐時往前伸的腳掌）
@@ -307,11 +319,25 @@ export class Skeleton {
     shapeCtx.globalCompositeOperation = "source-over"; shapeCtx.clearRect(0, 0, shape.width, shape.height);
     shapeCtx.drawImage(body, 0, 0);
     shapeCtx.globalCompositeOperation = "source-in"; shapeCtx.fillStyle = OUTLINE_COLOR; shapeCtx.fillRect(0, 0, shape.width, shape.height);
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    for (const [dx, dy] of OUTLINE_DIRECTIONS) ctx.drawImage(shape, 0, 0, right - left, lower - upper, left + dx * width, upper + dy * width, right - left, lower - upper);
-    ctx.drawImage(body, 0, 0, right - left, lower - upper, left, upper, right - left, lower - upper);
-    ctx.restore();
+    const w = right - left, h = lower - upper;
+    if (!memo) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      for (const [dx, dy] of OUTLINE_DIRECTIONS) ctx.drawImage(shape, 0, 0, w, h, left + dx * width, upper + dy * width, w, h);
+      ctx.drawImage(body, 0, 0, w, h, left, upper, w, h);
+      ctx.restore();
+      return true;
+    }
+    // 畫進這個人自己的畫布（外框往外偏的量在 pad 裡，不會被切掉），存起來下次重用，再貼到畫面上
+    memo.canvas ??= document.createElement("canvas");
+    if (memo.canvas.width !== w || memo.canvas.height !== h) { memo.canvas.width = w; memo.canvas.height = h; }
+    const memoCtx = memo.canvas.getContext("2d");
+    memoCtx.clearRect(0, 0, w, h);
+    for (const [dx, dy] of OUTLINE_DIRECTIONS) memoCtx.drawImage(shape, 0, 0, w, h, dx * width, dy * width, w, h);
+    memoCtx.drawImage(body, 0, 0, w, h, 0, 0, w, h);
+    Object.assign(memo, { inputs, pose, origin, left, upper });
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(memo.canvas, left, upper); ctx.restore();
+    return true;
   }
 
   /** 擺好姿勢後，每片皮膚零件四個角在骨架畫布座標上的位置（only：只算這些骨頭）。 */
@@ -555,6 +581,17 @@ export class Skeleton {
     }
     ctx.restore();
   }
+}
+
+/** 兩個姿勢差不多：每根骨頭的角度、位移差不到 tolerance，縮放差不到 tolerance 的百分之一，換的零件一樣。 */
+function posesClose(a, b, tolerance) {
+  for (const name of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    const p = a[name] ?? {}, q = b[name] ?? {};
+    if (p.variant !== q.variant) return false;
+    for (const key of ["angle", "x", "y"]) if (Math.abs((p[key] ?? 0) - (q[key] ?? 0)) > tolerance) return false;
+    for (const key of ["sx", "sy"]) if (Math.abs((p[key] ?? 1) - (q[key] ?? 1)) > tolerance / 100) return false;
+  }
+  return true;
 }
 
 /** 手臂的三根骨頭（l 或 r）。 */

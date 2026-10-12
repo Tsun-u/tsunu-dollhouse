@@ -51,6 +51,21 @@ const SLEEP_HIP_CELLS = 1.3;   // 躺著時臀部離床頭幾格，頭才會落�
 const SLEEP_Z_LIFT = 30;       // 躺著時 z 從腳底往上這麼多畫面像素冒出來
 const DOOR_H = 84, DOOR_INSET = 0.14;   // 門的畫面高度；門框左右各內縮幾成格寬
 const LABEL = { atone: "阿童", tsunu: "阿宇" };
+const STILL_ANIMS = new Set(["idle", "sit", "lounge", "sleep"]);   // 只有呼吸起伏的動作：畫好的人像可以重用
+const STILL_POSE_TOLERANCE = 2;   // 姿勢差不到 2 度、2 個骨架單位（約 0.15 畫面 px）就不重畫
+const CROWD = 4;                  // 房間裡超過這麼多人：走路的腳步也重用人像
+const CROWD_WALK_TOLERANCE = 5;   // 人多時走路姿勢差 5 度以上才重畫（腳步一秒更新十幾次）
+const FRESH_PER_FRAME = 1;        // 一幀最多重畫幾個可重用的人像，其餘先貼舊的（平移到新位置），下一幀再輪
+const MAX_DEFERRED_FRAMES = 6;    // 連續被延這麼多幀的人，不管額度一定重畫，走路才不會變成腳不動地滑
+
+/** 在家穿的衣服（鞋子不畫）；同一套衣服回傳同一個陣列，播放器才認得出「衣服沒變」、重用畫好的人像。 */
+function indoorOutfits(character) {
+  if (character.indoorFor !== character.outfits) {
+    character.indoorFor = character.outfits;
+    character.indoorOutfits = (character.outfits ?? []).filter((outfit) => !outfit.outdoor);
+  }
+  return character.indoorOutfits;
+}
 const THIRSTY_MS = 3 * 86_400_000;   // 跟伺服器同一個數字
 const isThirsty = (piece) => !!piece.wateredAt && Date.now() - new Date(piece.wateredAt).getTime() > THIRSTY_MS;   // 坐姿時整個人往下移的畫面像素
 
@@ -148,7 +163,7 @@ export class RoomView {
     this.cuddleTimer = setTimeout(() => {
       const backHug = !!actor.behind;
       for (const who of [actor, target]) {
-        who.cuddleAt = who.behind = who.headTilt = who.lean = null;
+        who.cuddleAt = who.cuddleWith = who.behind = who.headTilt = who.lean = null;
         if (backHug || who.anim === "hug" || who.anim === "hugged") { who.anim = "idle"; who.view = "front"; who.flip = false; }
       }
     }, kiss ? 2500 : 3200);
@@ -166,6 +181,7 @@ export class RoomView {
   strikeCuddlePose(actor, target, behind) {
     const dx = target.pos.x - actor.pos.x, dy = target.pos.y - actor.pos.y;
     actor.cuddleAt = actor.behind = actor.headTilt = actor.lean = target.cuddleAt = target.behind = target.headTilt = target.lean = null;
+    actor.cuddleWith = target; target.cuddleWith = actor;   // 抱在一起的對象：屋裡可能還有訪客，站位、圖層都照這個找
     if (behind) {   // 兩人面向同一邊（從發起的人走向對方的方向），發起的人貼在對方背後：從後方靠近就是斜前、從鏡頭這側靠近就是斜後
       const [ax, ay] = Math.abs(dx) >= Math.abs(dy) ? [Math.sign(dx) || 1, 0] : [0, Math.sign(dy)];
       const facingCamera = ax + ay > 0;
@@ -326,7 +342,7 @@ export class RoomView {
   drawnSpot(character) {
     if (character.drawnAt) return character.drawnAt;   // 鏡中的影像：位置由鏡子直接給
     if (character.cuddleAt && !character.behind) {
-      const partner = this.characters.find((who) => who !== character);
+      const partner = character.cuddleWith;
       const [px, py] = this.toScreen(partner.pos.x + 0.5, partner.pos.y + 0.5);
       const [cx] = this.toScreen(character.cuddleAt.x + 0.5, character.cuddleAt.y + 0.5);
       return [px + Math.sign(cx - px || 1) * CUDDLE_SIDE_PX, py];
@@ -347,7 +363,9 @@ export class RoomView {
     const skeleton = skeletons[view];
     const scale = CHARACTER_HEIGHT / skeleton.data.canvas.h;
     const [sx, sy] = this.drawnSpot(character);
-    const pose = samplePose(animations[anim], time, view);
+    const still = STILL_ANIMS.has(anim);
+    const phase = still || anim === "walk" ? (character.animPhase ??= Math.random() * 10) : 0;   // 每個人呼吸、腳步錯開：一屋子人不會同步，重畫人像也不會擠在同一幀
+    const pose = samplePose(animations[anim], time + phase, view);
     if (character.headTilt) pose.head = { ...pose.head, angle: (pose.head?.angle ?? 0) + character.headTilt };   // 正＝抬頭、負＝低頭
     if (character.lean) bendAtHips(pose, character.lean);
     const half = skeleton.data.canvas.w * scale / 2;
@@ -357,15 +375,23 @@ export class RoomView {
     const seatDrop = seat ? facingDrop ?? side.sitDrop ?? (this.facesAway(seat) ? AWAY_SIT_DROP : SIT_DROP) : 0;   // 坐著時腳落在格子前緣，屁股才會在坐墊上
     const shift = seat ? this.sitShift(seat) : 0;
     const undressed = character.bathing || character.showering;   // 泡澡、淋浴連內衣都脫掉（水面、霧面玻璃擋住身體）
-    const outfits = undressed ? character.headParts ?? [] : (character.outfits ?? []).filter((outfit) => !outfit.outdoor);   // 在家不穿鞋
+    const outfits = undressed ? character.headParts ?? [] : indoorOutfits(character);
     if (character.bathing && !only) only = new Set(skeleton.data.zOrder.filter((bone) => !/leg|foot|lower_arm|hand/.test(bone)));   // 腿和前臂泡在水裡：不畫，免得從浴缸外穿出來
-    skeleton.draw(this.ctx, pose, { x: (flip ? sx + half : sx - half) + shift, y: sy - skeleton.data.canvas.h * scale + 6 + seatDrop, scale, facing: flip ? -1 : 1, outfits, skin: character.skin ?? null, bodyTint: undressed ? null : character.bodyTint ?? null, only, underwear: !undressed, layer });
+    // 站、坐、躺的人重用剛畫好的人像；人多時走路的人也是（只差在移動，平移過去貼）
+    const tolerance = still ? STILL_POSE_TOLERANCE : anim === "walk" && this.characters.length > CROWD ? CROWD_WALK_TOLERANCE : 0;
+    const memo = tolerance && !only && !layer ? (character.drawMemo ??= { deferred: 0 }) : null;
+    const deferring = memo && this.freshBudget <= 0 && memo.deferred < MAX_DEFERRED_FRAMES;   // 這幀的重畫額度用完了：姿勢差多少都先貼舊的
+    const reuse = memo ? { memo, poseTolerance: deferring ? Infinity : tolerance } : {};
+    const fresh = skeleton.draw(this.ctx, pose, { x: (flip ? sx + half : sx - half) + shift, y: sy - skeleton.data.canvas.h * scale + 6 + seatDrop, scale, facing: flip ? -1 : 1, outfits, skin: character.skin ?? null, bodyTint: undressed ? null : character.bodyTint ?? null, only, underwear: !undressed, layer, ...reuse });
+    if (!memo) return;
+    if (fresh) { this.freshBudget--; memo.deferred = 0; }
+    else if (deferring) memo.deferred++;
   }
 
   /** 抱在一起的兩人（面對面抱抱、從後面抱、親親、抱著睡）：[上層的人, 下層的人]；沒有就 null。 */
   embrace() {
     const hugger = this.characters.find((who) => who.anim === "hug" || who.behind || who.anim === "sleep_hug");
-    const partner = hugger && (hugger.behind ?? this.characters.find((who) => who !== hugger && (hugger.anim === "sleep_hug" ? lying(who) : who.anim === "hugged")));
+    const partner = hugger && (hugger.behind ?? (hugger.anim === "sleep_hug" ? this.characters.find((who) => who !== hugger && !who.visitor && lying(who)) : hugger.cuddleWith));
     if (!partner) return null;
     return this.characterDepth(hugger) >= this.characterDepth(partner) ? [hugger, partner] : [partner, hugger];
   }
@@ -723,7 +749,7 @@ export class RoomView {
     if (alongPos < along - 0.5 || alongPos > along + width + 0.5 || distance > MIRROR_REACH) return null;
     const shown = along + width / 2 + (alongPos - along - width / 2) * MIRROR_SQUEEZE;   // 往鏡子中間收：兩人並肩站時都照得進去
     const [sx, sy] = wall === "back" ? this.toScreen(shown, 0) : this.toScreen(0, shown);
-    const image = { ...character, drawnAt: [sx, sy + MIRROR_FEET_DROP - distance * MIRROR_DISTANCE_RISE] };
+    const image = { ...character, drawnAt: [sx, sy + MIRROR_FEET_DROP - distance * MIRROR_DISTANCE_RISE], drawMemo: (character.mirrorMemo ??= { deferred: 0 }) };   // 鏡像的人像另外存，不蓋掉本人的
     this.face(image, ...mirroredFacing(character, wall));
     return image;
   }
@@ -751,6 +777,7 @@ export class RoomView {
 
   draw() {
     if (!this.state) return;
+    this.freshBudget = FRESH_PER_FRAME;
     const { ctx } = this;
     ctx.clearRect(0, 0, this.logical.w, this.logical.h);
     this.drawWalls();
@@ -781,7 +808,23 @@ export class RoomView {
     this.drawSteam(time);
     this.drawNight();
     this.drawHearts();
+    this.drawMarkers();
     this.drawBubbles();   // 對話框永遠在最上面
+  }
+
+  /** 標了 marker 的人（訪客頁的自己）頭上一個上下輕晃的小三角：一屋子人時找得到自己。 */
+  drawMarkers() {
+    const { ctx } = this;
+    for (const who of this.characters) {
+      if (!who.marker || !who.pos) continue;
+      const [sx, sy] = this.drawnSpot(who);
+      const y = sy - (lying(who) ? SLEEP_Z_LIFT : CHARACTER_HEIGHT) - 6 + Math.sin(performance.now() / 300) * 2;
+      ctx.save();
+      ctx.fillStyle = "#d98a5c"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(sx - 6, y - 9); ctx.lineTo(sx + 6, y - 9); ctx.lineTo(sx, y); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
   }
 
   /** 人物的繪製項目：抱在一起的兩人併成一項（深度用下層那人的），其他人各自一項。
@@ -813,7 +856,7 @@ export class RoomView {
       const seats = talking.map((who) => seated(who) ? this.seatAt(who.pos)?.id : null);
       if (seats[0] && seats[0] === seats[1]) {
         const [a, b] = talking;
-        const mid = { pos: { x: (a.pos.x + b.pos.x) / 2, y: (a.pos.y + b.pos.y) / 2 }, bubble: { text: `${LABEL[a.name]}：${a.bubble.text}\n${LABEL[b.name]}：${b.bubble.text}`, until: Math.max(a.bubble.until, b.bubble.until) } };
+        const mid = { pos: { x: (a.pos.x + b.pos.x) / 2, y: (a.pos.y + b.pos.y) / 2 }, bubble: { text: `${a.label ?? LABEL[a.name]}：${a.bubble.text}\n${b.label ?? LABEL[b.name]}：${b.bubble.text}`, until: Math.max(a.bubble.until, b.bubble.until) } };
         this.drawBubble(mid);
         return;
       }
