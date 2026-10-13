@@ -133,5 +133,17 @@
   "wearers": [
    "tsunu"
   ]
+ },
+ "pajama_top_gray": {
+  "label": "睡衣上衣",
+  "category": "pajama_top",
+  "color": "#b9b9b9",
+  "price": 120
+ },
+ "pajama_pants_gray": {
+  "label": "睡褲",
+  "category": "pajama_pants",
+  "color": "#b9b9b9",
+  "price": 110
  }
 }

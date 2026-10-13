@@ -4,8 +4,8 @@
 
 /** 衣服大類穿在哪一格（跟伺服器 src/catalog.ts 的 CATEGORY_SLOT 同一組）。 */
 export const CATEGORY_SLOT = {
-  camisole: "innerTop", tee: "top", tank: "top", hoodie: "top", shirt: "top", dress: "top", coat: "coat", apron: "wrap", cape: "wrap", scarf: "wrap",
-  leggings: "leggings", tights: "leggings", shorts: "bottom", pants: "bottom", wide_pants: "bottom", skirt: "bottom", pinafore: "overskirt", overalls: "overskirt", socks: "socks", shoes: "shoes", bowtie: "accessory", tie: "accessory",
+  camisole: "innerTop", tee: "top", tank: "top", hoodie: "top", shirt: "top", pajama_top: "top", dress: "top", coat: "coat", apron: "wrap", cape: "wrap", scarf: "wrap",
+  leggings: "leggings", tights: "leggings", shorts: "bottom", pants: "bottom", wide_pants: "bottom", pajama_pants: "bottom", skirt: "bottom", pinafore: "overskirt", overalls: "overskirt", socks: "socks", shoes: "shoes", bowtie: "accessory", tie: "accessory",
 };
 export const SLOT_LABEL = { innerTop: "內搭衣", top: "上衣", coat: "外套", wrap: "罩衫", leggings: "內搭褲", bottom: "下衣", overskirt: "罩裙", socks: "襪子", shoes: "鞋子", accessory: "飾品" };
 

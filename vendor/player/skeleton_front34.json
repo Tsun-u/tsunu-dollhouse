@@ -600,6 +600,46 @@
    "head:behind": [
     "front34_kid_sideponytailhl_hair_back.png"
    ]
+  },
+  "tpl_pajama_top": {
+   "upper_arm_r": [
+    "front34_tpl_pajama_top_upper_arm_r.png"
+   ],
+   "lower_arm_r": [
+    "front34_tpl_pajama_top_lower_arm_r.png"
+   ],
+   "torso": [
+    "front34_tpl_pajama_top_torso.png"
+   ],
+   "upper_arm_l": [
+    "front34_tpl_pajama_top_upper_arm_l.png"
+   ],
+   "lower_arm_l": [
+    "front34_tpl_pajama_top_lower_arm_l.png"
+   ],
+   "torso:armhole": [
+    "front34_tpl_pajama_top_armhole.png"
+   ]
+  },
+  "tpl_pajama_pants": {
+   "upper_leg_r": [
+    "front34_tpl_pajama_pants_upper_leg_r.png"
+   ],
+   "lower_leg_r": [
+    "front34_tpl_pajama_pants_lower_leg_r.png"
+   ],
+   "torso": [
+    "front34_tpl_pajama_pants_torso.png"
+   ],
+   "upper_leg_l": [
+    "front34_tpl_pajama_pants_upper_leg_l.png"
+   ],
+   "lower_leg_l": [
+    "front34_tpl_pajama_pants_lower_leg_l.png"
+   ],
+   "upper_leg_l:clip": [
+    "front34_tpl_pajama_pants_thigh_patch.png"
+   ]
   }
  },
  "skinGray": true,
@@ -629,6 +669,9 @@
    "torso": "foot_l"
   },
   "tpl_dress": {
+   "torso": "foot_l"
+  },
+  "tpl_pajama_top": {
    "torso": "foot_l"
   }
  }

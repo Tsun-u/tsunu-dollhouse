@@ -35,6 +35,8 @@ const COAT_EDGE_BAND = 8;    // 離外套最左（右）邊幾 px 內的像素�
 const CLIP_MIN_BEND = 45;
 // outfitAfter 只對某套衣服加，例如裙子 { "upper_leg_l": "lower_leg_l" } 讓裙襬蓋在小腿上（長褲不用）；
 // 鍵也可以是單片的零件圖檔名，例如外套 { "torso": "upper_leg_l", "front34_tpl_coat_collar.png": "upper_arm_l" }：身體蓋大腿、領片蓋近側袖子。
+const PART_RETRIES = 3;        // 零件圖載不到時最多再試幾次（網路一時不穩，不用整頁重新整理）
+const PART_RETRY_MS = 5000;    // 載不到之後隔多久才允許再試
 const DYE_LINE_LUM = 0.25;   // 比這暗的像素算輪廓線，不算進布料的平均亮度
 const DYE_MAX_GAIN = 1.25;  // 亮部最多比目標色亮這麼多（再亮就被截成目標色的 1.25 倍）
 const GARMENT_AFTER = { lower_leg_l: "foot_l", lower_leg_r: "foot_r", lower_arm_l: "hand_l", lower_arm_r: "hand_r" };
@@ -77,11 +79,18 @@ export class Skeleton {
     this.rebuild();
   }
 
-  /** 還沒載的零件開始載（每片只載一次，載不到也不重試）；loadSkeleton 沒開 lazyOutfits 時沒有 loadPart，什麼都不做。 */
+  /** 還沒載的零件開始載（同一片同時只載一次）；載不到的隔 PART_RETRY_MS 才允許再試，最多試 PART_RETRIES 次。
+   *  loadSkeleton 沒開 lazyOutfits 時沒有 loadPart，什麼都不做。 */
   requestPart(slot) {
     if (!this.loadPart) return;
     this.pendingParts ??= new Map();
-    if (!this.pendingParts.has(slot)) this.pendingParts.set(slot, this.loadPart(slot));
+    this.failedParts ??= new Map();
+    if (this.pendingParts.has(slot) || (this.failedParts.get(slot) ?? 0) >= PART_RETRIES) return;
+    this.pendingParts.set(slot, this.loadPart(slot).then(() => {
+      if (this.images[slot]) return;
+      this.failedParts.set(slot, (this.failedParts.get(slot) ?? 0) + 1);
+      setTimeout(() => this.pendingParts.delete(slot), PART_RETRY_MS);
+    }));
   }
 
   /** 先載好這幾套（draw 的 outfits 格式）的所有零件：換裝時先載，人轉到這個視角時衣服已經在，不會閃出素體。 */
