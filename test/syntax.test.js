@@ -4,7 +4,7 @@ import { readdirSync } from "node:fs";
 import { test } from "node:test";
 
 // 畫面程式要瀏覽器才跑得起來，其他測試不會載入它們：每支都先過一次語法檢查，打錯字推上去前就會被擋下。
-const folders = ["src", "vendor/web", "vendor/rules"];
+const folders = ["src", "vendor/web", "vendor/rules", "vendor/player"];
 
 for (const folder of folders) {
   const dir = new URL(`../${folder}/`, import.meta.url);

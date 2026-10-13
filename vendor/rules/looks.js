@@ -69,6 +69,62 @@ export const IRIS_COLORS = ["#5b3a24", "#8a5a2b", "#3f6fa8", "#4f8a5b", "#7a5aa6
 export const LIP_COLORS = ["#e8a48c", "#e2a0a0", "#de9a96", "#d65a6e", "#c86478", "#b4505a", "#e07a5a", "#a8506e"]; // 第一個是自然唇色
 /** 衣服的色票：衣服都是灰稿，自己挑顏色；第一個是灰稿原色。 */
 export const CLOTHES_COLORS = ["#b9b9b9", "#f2f2ee", "#f4b3c2", "#e07a7a", "#f2dc8c", "#9fd8c9", "#a9c8ee", "#4a6a9c", "#c9b6e4", "#c8a070", "#6b8f5a", "#3b3b44"];
+/** 衣服花紋（代號與中文名）：衣櫃、捏角、AI 工具共用這份；怎麼畫在播放器旁的 spike_player/patterns.js（test/patterns.test.ts 鎖住兩邊代號一致）。 */
+export const PATTERNS = [
+    { id: "plaid", label: "格紋" },
+    { id: "stripes_h", label: "橫條紋" },
+    { id: "stripes_v", label: "直條紋" },
+    { id: "dots", label: "點點" },
+    { id: "houndstooth", label: "千鳥格" },
+];
+export const PATTERN_IDS = PATTERNS.map((pattern) => pattern.id);
+/** 隨機穿搭的客人每件能染的衣服抽一次：四件裡一件穿花紋。 */
+export const PATTERN_ROLLS = [true, false, false, false];
+const isPatternId = (value) => PATTERN_IDS.includes(value);
+export function isDye(value) {
+    if (isColor(value))
+        return true;
+    if (typeof value !== "object" || value === null)
+        return false;
+    const { color, pattern, patternColor } = value;
+    return isColor(color) && isPatternId(pattern) && isColor(patternColor);
+}
+/** 存檔用的染法：色碼一律小寫、花紋物件只留三個欄位；不合法丟錯。 */
+export function normalizeDye(value) {
+    if (!isDye(value))
+        throw new Error(`顏色要是 #rrggbb，或 { color, pattern, patternColor }（pattern：${PATTERN_IDS.join("／")}）。`);
+    return typeof value === "string" ? value.toLowerCase() : { color: value.color.toLowerCase(), pattern: value.pattern, patternColor: value.patternColor.toLowerCase() };
+}
+export const dyeBase = (dye) => (typeof dye === "string" ? dye : dye.color);
+export const dyePattern = (dye) => (dye && typeof dye === "object" ? dye.pattern : null);
+export const patternLabel = (pattern) => PATTERNS.find((option) => option.id === pattern).label;
+const dyeKey = (dye) => (dye == null ? "" : typeof dye === "string" ? dye.toLowerCase() : `${dye.color}/${dye.pattern}/${dye.patternColor}`.toLowerCase());
+/** 兩個染法一樣（物件比內容，不比參照）；null 與 undefined 都是「沒挑過」。 */
+export const sameDye = (a, b) => dyeKey(a) === dyeKey(b);
+/** 換底色，花紋留著。 */
+export const withBase = (dye, color) => (typeof dye === "string" ? color : { ...dye, color });
+/** 換花紋：null 改回素色；原本是素色時，花紋色挑 palette 裡跟底色亮度差最大的。 */
+export function withPattern(dye, pattern, palette) {
+    const color = dyeBase(dye);
+    if (!pattern)
+        return color;
+    return { color, pattern, patternColor: typeof dye === "string" ? contrastColor(color, palette) : dye.patternColor };
+}
+export const withPatternColor = (dye, patternColor) => ({ ...dye, patternColor });
+const lightness = (hex) => [1, 3, 5].reduce((sum, k, i) => sum + parseInt(hex.slice(k, k + 2), 16) * [0.299, 0.587, 0.114][i], 0);
+/** palette 裡跟 color 亮度差最大的顏色；palette 空的就用白或黑。 */
+export function contrastColor(color, palette) {
+    const options = palette.length ? palette : ["#ffffff", "#000000"];
+    return options.reduce((best, option) => (Math.abs(lightness(option) - lightness(color)) > Math.abs(lightness(best) - lightness(color)) ? option : best));
+}
+/** 隨機穿搭的一件衣服：從 palette 抽底色；抽到穿花紋就再抽花紋與另一個顏色（跟底色不同）。pick 是種子抽籤，同一顆種子永遠同一件。 */
+export function randomDye(pick, palette) {
+    const color = pick(palette);
+    if (!pick(PATTERN_ROLLS))
+        return color;
+    const others = palette.filter((option) => option !== color);
+    return { color, pattern: pick(PATTERN_IDS), patternColor: pick(others.length ? others : [contrastColor(color, [])]) };
+}
 /** 小屋保留給阿童、阿宇本人的長相：人類和 AI 訪客挑不到，免得有人冒充屋主（眼鏡開放；隨機客人不受限）。 */
 export const HOST_LOOKS = new Set(["curly_short", "tousled", "gentle", "calm"]);
 /** 五官高度可以調的範圍（原圖 px）。 */

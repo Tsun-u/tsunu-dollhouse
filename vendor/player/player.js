@@ -5,6 +5,8 @@
 // 每個視角在 skeleton.json 用 forward 宣告「往前」在畫面上是順時針（+1）還是逆時針（−1）；
 // 正面沒有前後方向，走路這類前後動作要在 animation.views.front 另外給一組關鍵格。
 
+import { dyeCacheKey, dyeColor, hexRgb, patternCoverage } from "./patterns.js";
+
 export const EASING = {
   linear: t => t,
   easeInOutSine: t => -(Math.cos(Math.PI * t) - 1) / 2,
@@ -175,11 +177,10 @@ export class Skeleton {
     return canvas;
   }
 
-  /** 零件圖乘上一個顏色（膚色、衣服主色），結果依顏色快取。 */
-  /** 衣服染色：先去色，每個像素的亮度除以這片布的平均亮度（不算深色輪廓線），再乘上目標色。
-   *  布料主色剛好變成目標色，陰影、亮部照比例變深變淺；輪廓線本來就深，染完還是深。灰色畫的衣服最準，有顏色的舊衣服也能染。 */
-  dyed(slot, color) {
-    const key = `dye|${slot}|${color}`;
+  /** 衣服染色（dye：色碼，或 { color, pattern, patternColor } 花紋）：先去色，每個像素的亮度除以這片布的平均亮度（不算深色輪廓線），再乘上目標色。
+   *  花紋：目標色照那一點被花紋蓋住多少，在底色與花紋色之間混；花紋座標用原圖座標（裁切前），同一件衣服拆出來的各片接得上。 */
+  dyed(slot, dye) {
+    const key = `dye|${slot}|${dyeCacheKey(dye)}`;
     if (!this.tintCache) this.tintCache = new Map();
     if (this.tintCache.has(key)) return this.tintCache.get(key);
     const source = this.images[slot];
@@ -193,11 +194,15 @@ export class Skeleton {
     let sum = 0, count = 0;
     for (let i = 0; i < px.length; i += 4) if (px[i + 3] > 128) { const l = lum(i); if (l > DYE_LINE_LUM) { sum += l; count++; } }
     const base = count ? sum / count : 1;
-    const target = [1, 3, 5].map((k) => parseInt(color.slice(k, k + 2), 16));
+    const target = hexRgb(dyeColor(dye));
+    const mark = typeof dye === "string" ? null : hexRgb(dye.patternColor);
+    const [ox, oy] = this.offsetOf(slot);
+    const width = canvas.width;
     for (let i = 0; i < px.length; i += 4) {
       if (!px[i + 3]) continue;
       const g = Math.min(DYE_MAX_GAIN, lum(i) / base);
-      for (let k = 0; k < 3; k++) px[i + k] = Math.min(255, Math.round(target[k] * g));
+      const t = mark ? patternCoverage(dye.pattern, ox + ((i / 4) % width), oy + Math.floor(i / 4 / width)) : 0;
+      for (let k = 0; k < 3; k++) px[i + k] = Math.min(255, Math.round((target[k] + (mark ? (mark[k] - target[k]) * t : 0)) * g));
     }
     c.putImageData(image, 0, 0);
     this.tintCache.set(key, canvas);
@@ -245,7 +250,7 @@ export class Skeleton {
   insideCoat(image, slot, tint, coatSlots) {
     const outside = this.coatOutside(coatSlots);
     if (!outside) { coatSlots.forEach((coatSlot) => this.requestPart(coatSlot)); return image; }
-    const key = `coat|${slot}|${tint}|${coatSlots.join("|")}`;
+    const key = `coat|${slot}|${tint ? dyeCacheKey(tint) : ""}|${coatSlots.join("|")}`;
     this.tintCache ??= new Map();
     if (this.tintCache.has(key)) return this.tintCache.get(key);
     const [ox, oy] = this.offsetOf(slot);
@@ -258,6 +263,7 @@ export class Skeleton {
     return canvas;
   }
 
+  /** 零件圖乘上一個顏色（膚色、衣服主色），結果依顏色快取。 */
   tinted(slot, color) {
     const key = `${slot}|${color}`;
     if (!this.tintCache) this.tintCache = new Map();
@@ -451,7 +457,7 @@ export class Skeleton {
         if (!this.images[slot]) { this.requestPart(slot); continue; }
         const isSkin = slot.includes("skin_");
         const look = tint ? this.dyed(slot, tint)
-          : isSkin && bodyColor ? (this.data.skinGray ? this.dyed(slot, bodyColor) : this.tinted(slot, bodyColor))
+          : isSkin && bodyColor ? (this.data.skinGray ? this.dyed(slot, bodyColor) : this.tinted(slot, dyeColor(bodyColor)))
           : isSkin && this.data.skinGray ? this.graded(slot, skin ?? DEFAULT_SKIN)
           : isSkin && skin ? this.tinted(slot, skin)
           : this.images[slot];

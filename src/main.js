@@ -1,14 +1,16 @@
 // 小屋娃娃屋：把小屋匯出的規則、畫面、素材接起來，加上最多四個自己捏的娃娃。
 // 遊戲存檔（錢、材料、家具、咖啡廳）交給 game.js，娃娃存檔交給 dolls.js，兩份都在這台瀏覽器。
 
+import { paintSwatch } from "../vendor/player/patterns.js";
 import { loadSkeleton, samplePose } from "../vendor/player/player.js";
-import { BODIES, CLOTHES_COLORS, headParts, randomLooks } from "../vendor/rules/looks.js";
+import { BODIES, CLOTHES_COLORS, PATTERNS, dyeBase, dyePattern, headParts, randomDye, randomLooks, sameDye, withBase, withPattern, withPatternColor } from "../vendor/rules/looks.js";
 import { SHOP_LABEL, SHOP_RENT } from "../vendor/rules/state.js";
 import { CafeView } from "../vendor/web/cafe-view.js";
 import { CATEGORY_SLOT, SLOT_LABEL, dressUp, dyeable } from "../vendor/web/dress.js";
 import { IconSheet } from "../vendor/web/icons.js";
 import { PuzzleView } from "../vendor/web/puzzle-view.js";
 import { StreetView } from "../vendor/web/street-view.js";
+import { dyeSwatch, patternRow } from "../vendor/web/swatches.js";
 import { WorkshopView } from "../vendor/web/workshop-view.js";
 import { startCafeClock } from "./cafe-clock.js";
 import { setupCreator } from "./creator.js";
@@ -94,7 +96,7 @@ house.room.drawTableIcon = (ctx, item, x, y, size) => {   // 桌上的商品、�
 const puzzle = new PuzzleView($("board"), $("puzzleInfo"), $("puzzleStart"), icons, apply, content.settings.stamina, () => $("puzzleShop").value || undefined);
 const workshop = new WorkshopView({ materials: $("materials"), grid: $("grid"), products: $("products") }, content.recipes, icons, apply);
 const guests = Object.entries(BODIES).map(([body, spec]) => ({ body, views: { front: skeletons[spec.views.front], front34: skeletons[spec.views.front34], back34: skeletons[spec.views.back34] } }));
-const cafe = new CafeView($("cafeCanvas"), { skeleton: skeletons.front, guests, looks: { BODIES, CLOTHES_COLORS, headParts, randomLooks }, clothes: content.clothes, dress: { dressUp, dyeable, CATEGORY_SLOT }, animations, samplePose }, icons, apply);
+const cafe = new CafeView($("cafeCanvas"), { skeleton: skeletons.front, guests, looks: { BODIES, CLOTHES_COLORS, headParts, randomLooks, randomDye }, clothes: content.clothes, dress: { dressUp, dyeable, CATEGORY_SLOT }, animations, samplePose }, icons, apply);
 startCafeClock(game);
 
 // ───────── 商店街：咖啡廳加上租來的雜貨店、服飾店（跟小屋一樣），每家店可以換裝潢 ─────────
@@ -273,13 +275,13 @@ function closetLook(doll) {
   return closetDraft?.id === doll.id ? closetDraft : { id: doll.id, worn: { ...doll.worn }, colors: { ...(doll.colors ?? {}) } };
 }
 
-/** 兩份「格子 → 衣服」或「衣服 → 顏色」一樣。 */
-const sameEntries = (a, b) => [...new Set([...Object.keys(a), ...Object.keys(b)])].every((key) => a[key] === b[key]);
+/** 兩份「格子 → 衣服」或「衣服 → 染法」一樣；same 比兩個值（染法用 sameDye 比內容）。 */
+const sameEntries = (a, b, same = (x, y) => x === y) => [...new Set([...Object.keys(a), ...Object.keys(b)])].every((key) => same(a[key], b[key]));
 
 /** 草稿跟娃娃身上的不一樣：有東西要存。 */
 function closetChanged() {
   const doll = closetDraft && dollsSave.dolls.find((d) => d.id === closetDraft.id);
-  return !!doll && !(sameEntries(doll.worn, closetDraft.worn) && sameEntries(doll.colors ?? {}, closetDraft.colors));
+  return !!doll && !(sameEntries(doll.worn, closetDraft.worn) && sameEntries(doll.colors ?? {}, closetDraft.colors, sameDye));
 }
 
 function editCloset(doll, change) {
@@ -334,7 +336,7 @@ function renderCloset() {
   const colorOf = (item) => colors[item] ?? content.clothes[item].color;
   const wearers = (item) => dollsSave.dolls.filter((d) => Object.values(d.worn).includes(item) && !Object.values(BODIES[d.body].starter).includes(item)).length;
   const sellable = (item) => (game.state.wardrobe[item] ?? 0) > wearers(item);   // 衣櫃裡比穿著它的娃娃多的才能賣（基本款每個娃娃都有，不算）
-  // 照格子由內到外分組，每格一行標題；點了試穿，已經穿著的再點一次是脫掉那一格；穿著的那件下面一排色票換顏色；按存檔才寫進娃娃
+  // 照格子由內到外分組，每格一行標題；點了試穿，已經穿著的再點一次是脫掉那一格；穿著的那件下面換底色、花紋，選了花紋再多一排花紋色；按存檔才寫進娃娃
   $("wardrobe").replaceChildren(...Object.keys(SLOT_LABEL).flatMap((slot) => {
     const inSlot = items.filter((item) => CATEGORY_SLOT[content.clothes[item].category] === slot);
     if (!inSlot.length) return [];
@@ -342,7 +344,7 @@ function renderCloset() {
     const chips = inSlot.map((item) => {
       const on = worn[slot] === item;
       const chip = Object.assign(document.createElement("button"), { className: "item" + (on ? " on" : "") });
-      chip.innerHTML = `<span class="swatch" style="background:${colorOf(item)}"></span>${content.clothes[item].label}`;
+      chip.append(dyeSwatch(colorOf(item), paintSwatch), content.clothes[item].label);
       chip.onclick = () => editCloset(doll, (current) => { const { [slot]: _, ...rest } = current.worn; return { worn: on ? rest : { ...current.worn, [slot]: item } }; });
       if (sellable(item)) chip.append(Object.assign(document.createElement("span"), {
         className: "sell", role: "button", textContent: `賣 $${Math.floor(content.clothes[item].price / 2)}`,
@@ -354,15 +356,25 @@ function renderCloset() {
     const spec = content.clothes[wearing];
     const recolorable = spec && (spec.dye || !spec.sprites?.[BODIES[doll.body].sprites]);   // 彩色原稿（牛仔短褲）不給換色；灰稿與用模板畫的才行
     if (!inSlot.includes(wearing) || !recolorable) return [title, ...chips];
-    const palette = Object.assign(document.createElement("div"), { className: "swatches wardrobe-colors" });
-    palette.append(...CLOTHES_COLORS.map((color) => {
-      const button = Object.assign(document.createElement("button"), { title: color, onclick: () => editCloset(doll, (current) => ({ colors: { ...current.colors, [wearing]: color } })) });
-      button.style.background = color;
-      if (colorOf(wearing) === color) button.classList.add("on");
-      return button;
-    }));
-    return [title, ...chips, palette];
+    const dye = colorOf(wearing);
+    const setDye = (next) => editCloset(doll, (current) => ({ colors: { ...current.colors, [wearing]: next } }));
+    const pattern = dyePattern(dye);
+    return [title, ...chips,
+      colorButtons(CLOTHES_COLORS, dyeBase(dye), (color) => setDye(withBase(dye, color))),
+      patternRow(PATTERNS, pattern, (p) => dyeSwatch(withPattern(dye, p, CLOTHES_COLORS), paintSwatch), (p) => setDye(withPattern(dye, p, CLOTHES_COLORS))),
+      ...(pattern ? [Object.assign(document.createElement("div"), { className: "wardrobe-sub", textContent: "花紋色" }), colorButtons(CLOTHES_COLORS, dye.patternColor, (color) => setDye(withPatternColor(dye, color)))] : [])];
   }));
+}
+
+/** 衣櫃的一排色票：current 那顆亮著，點了呼叫 onPick(color)。 */
+function colorButtons(colors, current, onPick) {
+  const row = Object.assign(document.createElement("div"), { className: "swatches wardrobe-colors" });
+  row.append(...colors.map((color) => {
+    const button = Object.assign(document.createElement("button"), { title: color, className: color === current ? "on" : "", onclick: () => onPick(color) });
+    button.style.background = color;
+    return button;
+  }));
+  return row;
 }
 
 function drawCloset(time) {

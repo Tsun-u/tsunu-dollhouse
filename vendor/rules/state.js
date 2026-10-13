@@ -1,5 +1,5 @@
 import { CATEGORY_SLOT, SLOT_LABEL } from "./clothing.js";
-import { BODIES } from "./looks.js";
+import { BODIES, dyePattern, normalizeDye, patternLabel, sameDye } from "./looks.js";
 import { createBoard, finale, random, swap } from "./match3.js";
 import { createWorkshop, moveOrMerge, putMaterial } from "./workshop.js";
 export const JOURNAL_LIMIT = 500;
@@ -203,8 +203,10 @@ function reduce(state, action, context) {
             if (action.color === null)
                 delete colors[action.item];
             else
-                colors[action.item] = hexColor(action.color);
-            return { state: { ...state, clothesColors: colors }, note: action.color === null ? `把${spec.label}換回原本的顏色` : `把${spec.label}換了顏色` };
+                colors[action.item] = normalizeDye(action.color);
+            const pattern = action.color === null ? null : dyePattern(action.color);
+            const note = action.color === null ? `把${spec.label}換回原本的顏色` : pattern ? `把${spec.label}換成${patternLabel(pattern)}` : `把${spec.label}換了顏色`;
+            return { state: { ...state, clothesColors: colors }, note };
         }
         case "paint_furniture": {
             const { piece } = findPlaced(state, action.id);
@@ -265,21 +267,26 @@ function reduce(state, action, context) {
             }
             const removed = Object.entries(before).filter(([slot]) => !action.worn[slot]).map(([, item]) => clothes[item]?.label ?? item);
             const colors = { ...state.clothesColors };
-            const recolored = [];
+            const recolored = []; // 換成素色或原色的衣服
+            const patterned = []; // 換成花紋的，一件一句：「把T 恤換成格紋」
             for (const [item, color] of Object.entries(action.colors ?? {})) {
                 const spec = owned(item);
-                const next = color === null ? undefined : hexColor(color);
-                if (colors[item] === next)
+                const next = color === null ? undefined : normalizeDye(color);
+                if (sameDye(colors[item], next))
                     continue;
                 if (next === undefined)
                     delete colors[item];
                 else
                     colors[item] = next;
-                recolored.push(spec.label);
+                const pattern = next === undefined ? null : dyePattern(next);
+                if (pattern)
+                    patterned.push(`把${spec.label}換成${patternLabel(pattern)}`);
+                else
+                    recolored.push(spec.label);
             }
-            if (!added.length && !removed.length && !recolored.length)
+            if (!added.length && !removed.length && !recolored.length && !patterned.length)
                 throw new Error("沒有要換的。");
-            const parts = [...(added.length ? [`換上了${added.join("、")}`] : []), ...(removed.length ? [`脫下了${removed.join("、")}`] : []), ...(recolored.length ? [`把${recolored.join("、")}換了顏色`] : [])];
+            const parts = [...(added.length ? [`換上了${added.join("、")}`] : []), ...(removed.length ? [`脫下了${removed.join("、")}`] : []), ...(recolored.length ? [`把${recolored.join("、")}換了顏色`] : []), ...patterned];
             return { state: { ...state, worn: { ...state.worn, [who]: { ...action.worn } }, clothesColors: colors }, note: `${who !== context.actor ? `幫${ACTOR_NAME[who]}` : ""}${parts.join("，")}` };
         }
         case "give": {

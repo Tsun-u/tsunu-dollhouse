@@ -186,7 +186,7 @@ export class CafeView {
     return { views: wardrobe.views, skin: looks.skin, outfits, bodyTint };
   }
 
-  /** 客人每一格穿什麼：上衣必穿，不是洋裝就配下衣，罩裙、外套、飾品照機率加穿，鞋子一定穿；能換色的衣服從共用色票抽顏色。
+  /** 客人每一格穿什麼：上衣必穿，不是洋裝就配下衣，罩裙、外套、飾品照機率加穿，鞋子一定穿；能換色的衣服從共用色票抽顏色，有時穿花紋（looks.randomDye）。
    *  只挑這個素體穿得了、每個視角都畫得出來的衣服。 */
   randomWorn(pick, wardrobe) {
     const worn = {}, colors = {};
@@ -196,7 +196,7 @@ export class CafeView {
       const [id, spec] = pick(options) ?? [];
       if (!id) return;
       worn[slot] = id;
-      if (this.dress.dyeable(spec)) colors[id] = pick(this.looks.CLOTHES_COLORS);
+      if (this.dress.dyeable(spec)) colors[id] = this.looks.randomDye(pick, this.looks.CLOTHES_COLORS);
     };
     put("top");
     const dress = this.clothes[worn.top]?.category === "dress";
