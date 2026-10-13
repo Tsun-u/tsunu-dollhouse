@@ -12,6 +12,14 @@ const $ = (id) => document.getElementById(id);
 const WAVE_MS = 3200;
 const button = (label, onclick, className = "item") => Object.assign(document.createElement("button"), { className, textContent: label, onclick });
 
+/** 電視的頻道小卡：正在播的那台亮著（點了不用再轉一次），其他點了就轉過去。 */
+function channelChips(tv, piece, onPick) {
+  return tv.programs.map((program) => {
+    const playing = piece.on && piece.program === program;
+    return button(program, playing ? null : () => onPick(program), playing ? "item on" : "item");
+  });
+}
+
 export class House {
   /**
    * @param deps { game, content, skeletons, animations, samplePose, dressUp, dolls: () => dollsSave, updateDoll(id, changes), select(id), apply(action, doer) → 新寫的日誌或 null, icons: () => 圖示表 }
@@ -272,7 +280,7 @@ export class House {
       }
     }
     if (spec?.switch) actions.push(button(piece.on ? "關燈" : "開燈", () => this.act({ kind: "toggle", id: piece.id }), ""));
-    if (spec?.tv) actions.push(button(piece.on ? "關電視" : "開電視", () => this.act({ kind: "toggle", id: piece.id }), ""));
+    if (spec?.tv) actions.push(button(piece.on ? "關電視" : "開電視", () => this.act({ kind: "toggle", id: piece.id }), ""), button("下一台", () => this.act({ kind: "tv_channel", id: piece.id }), ""));
     if (spec?.readable && this.deps.content.fortunes.length) actions.push(button("翻書", () => this.act({ kind: "read", id: piece.id }), ""));
     if (spec?.plant) actions.push(button("澆水", () => this.act({ kind: "water", id: piece.id }), ""));
     if (spec?.washbasin && doll) {   // 洗手台：洗手、刷牙；同一間房的娃娃可以一起刷牙（兩人各自走到旁邊、各自刷）
@@ -308,6 +316,8 @@ export class House {
       $("piecePalette").replaceChildren(Object.assign(document.createElement("span"), { textContent: `${spec.label}的布面` }),
         button("原色", () => paint(null), "reset"), swatchRow(CLOTHES_COLORS, piece.tint ?? null, paint));
     }
+    $("tvChannels").hidden = !spec?.tv;
+    if (spec?.tv) $("tvChannels").replaceChildren(...channelChips(spec.tv, piece, (program) => this.act({ kind: "tv_channel", id: piece.id, program })));
   }
 
   /** 選取的娃娃跟同一間房的其他娃娃能做的事。 */

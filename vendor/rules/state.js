@@ -51,7 +51,7 @@ const RECONNECT_GRACE_MS = 10 * 60_000; // 出門不到這麼久就回來，是�
 export const STARTER_INVENTORY = { sofa: 1, table: 1, bed: 1, bookshelf: 1, plant: 2, lamp: 1, rug: 1, dogbed: 2 };
 export const STARTER_WARDROBE = { tee_gray: 1, jeans_shorts: 1, shirt_gray: 1, pants_gray: 1, shoes_gray: 1 };
 export const STARTER_WORN = { atone: { ...BODIES.f.starter }, tsunu: { ...BODIES.m.starter } }; // 兩版共用的起始穿著（鞋子在家不穿、在店裡穿）
-export const STARTER_CLOTHES_COLORS = { ...BODIES.f.starterColors, ...BODIES.m.starterColors };
+export const STARTER_CLOTHES_COLORS = { atone: { ...BODIES.f.starterColors }, tsunu: { ...BODIES.m.starterColors } };
 export function createInitialState() {
     return {
         version: 1, revision: 0, money: 0,
@@ -67,7 +67,7 @@ export function createInitialState() {
         milestones: {},
         wardrobe: { ...STARTER_WARDROBE },
         worn: { atone: { ...STARTER_WORN.atone }, tsunu: { ...STARTER_WORN.tsunu } },
-        clothesColors: { ...STARTER_CLOTHES_COLORS },
+        clothesColors: { atone: { ...STARTER_CLOTHES_COLORS.atone }, tsunu: { ...STARTER_CLOTHES_COLORS.tsunu } },
         journal: [],
         chat: [],
         shelf: [],
@@ -96,7 +96,7 @@ const TWEAK_WINDOW_MS = 2 * 60_000;
 /** 推播分級：這些動作是流水帳，併進每小時彙總；其他（對阿宇的互動、走進哪間房、里程碑、派單…）即時推。
  *  個別結果可以用 Reduced.tier 覆寫，例如第一次做出某商品、服務人次里程碑、雙人三消輪到誰。 */
 const DIGEST_KINDS = new Set([
-    "workshop_move", "craft", "serve", "customer_leave", "wear", "place", "move", "flip", "store", "read", "shelve", "toggle", "water",
+    "workshop_move", "craft", "serve", "customer_leave", "wear", "place", "move", "flip", "store", "read", "shelve", "toggle", "tv_channel", "water",
     "buy", "sell_furniture", "buy_clothes", "sell_clothes", "grant", "take_from_table", "throw_ball", "pet", "feed", "puzzle_start", "puzzle_swap", "shop_open", "keep_clothes",
 ]);
 function reduce(state, action, context) {
@@ -188,25 +188,31 @@ function reduce(state, action, context) {
                 throw new Error(`${spec.label}正穿在${wearers.map((who) => ACTOR_NAME[who]).join("和")}身上，先脫下來才能賣。`);
             const refund = Math.floor(spec.price * RESALE_RATE);
             const wardrobe = adjust(state.wardrobe, action.item, -1);
-            const colors = { ...state.clothesColors };
-            if (!wardrobe[action.item])
-                delete colors[action.item]; // 賣光了，顏色也不用記了
+            const colors = { atone: { ...state.clothesColors.atone }, tsunu: { ...state.clothesColors.tsunu } };
+            if (!wardrobe[action.item]) {
+                delete colors.atone[action.item];
+                delete colors.tsunu[action.item];
+            } // 賣光了，兩人的顏色都不用記了
             return { state: { ...state, money: state.money + refund, wardrobe, clothesColors: colors }, note: `賣掉一件${spec.label}，拿回 ${refund}` };
         }
         case "dye_clothes": {
+            if (context.actor === "game")
+                throw new Error("小屋自己不穿衣服。");
+            const who = action.who ?? context.actor;
             const spec = context.content.clothes[action.item];
             if (!spec)
                 throw new Error(`沒有「${action.item}」這件衣服。`);
             if (!state.wardrobe[action.item])
                 throw new Error(`衣櫃裡沒有${spec.label}。`);
-            const colors = { ...state.clothesColors };
+            const colors = { ...state.clothesColors[who] };
             if (action.color === null)
                 delete colors[action.item];
             else
                 colors[action.item] = normalizeDye(action.color);
             const pattern = action.color === null ? null : dyePattern(action.color);
-            const note = action.color === null ? `把${spec.label}換回原本的顏色` : pattern ? `把${spec.label}換成${patternLabel(pattern)}` : `把${spec.label}換了顏色`;
-            return { state: { ...state, clothesColors: colors }, note };
+            const helping = who !== context.actor ? `幫${ACTOR_NAME[who]}` : "";
+            const note = action.color === null ? `${helping}把${spec.label}換回原本的顏色` : pattern ? `${helping}把${spec.label}換成${patternLabel(pattern)}` : `${helping}把${spec.label}換了顏色`;
+            return { state: { ...state, clothesColors: { ...state.clothesColors, [who]: colors } }, note };
         }
         case "paint_furniture": {
             const { piece } = findPlaced(state, action.id);
@@ -266,7 +272,7 @@ function reduce(state, action, context) {
                 added.push(spec.label);
             }
             const removed = Object.entries(before).filter(([slot]) => !action.worn[slot]).map(([, item]) => clothes[item]?.label ?? item);
-            const colors = { ...state.clothesColors };
+            const colors = { ...state.clothesColors[who] };
             const recolored = []; // 換成素色或原色的衣服
             const patterned = []; // 換成花紋的，一件一句：「把T 恤換成格紋」
             for (const [item, color] of Object.entries(action.colors ?? {})) {
@@ -287,7 +293,7 @@ function reduce(state, action, context) {
             if (!added.length && !removed.length && !recolored.length && !patterned.length)
                 throw new Error("沒有要換的。");
             const parts = [...(added.length ? [`換上了${added.join("、")}`] : []), ...(removed.length ? [`脫下了${removed.join("、")}`] : []), ...(recolored.length ? [`把${recolored.join("、")}換了顏色`] : []), ...patterned];
-            return { state: { ...state, worn: { ...state.worn, [who]: { ...action.worn } }, clothesColors: colors }, note: `${who !== context.actor ? `幫${ACTOR_NAME[who]}` : ""}${parts.join("，")}` };
+            return { state: { ...state, worn: { ...state.worn, [who]: { ...action.worn } }, clothesColors: { ...state.clothesColors, [who]: colors } }, note: `${who !== context.actor ? `幫${ACTOR_NAME[who]}` : ""}${parts.join("，")}` };
         }
         case "give": {
             if (context.actor === "game")
@@ -610,6 +616,10 @@ function reduce(state, action, context) {
         }
         case "toggle":
             return toggleSwitch(state, furniture, action.id, context.seed());
+        case "tv_channel":
+            if (context.actor === "game")
+                throw new Error("小屋自己不轉台。");
+            return switchChannel(state, furniture, action.id, action.program);
         case "read": {
             if (context.actor === "game")
                 throw new Error("小屋自己不看書。");
@@ -1089,6 +1099,17 @@ export function toggleSwitch(state, catalog, id, seed) {
         return on ? { state: replacePlaced(state, { ...rest, on, program }), note: `打開電視，正在播${program}` } : { state: replacePlaced(state, { ...rest, on }), note: "關掉電視" };
     }
     return { state: replacePlaced(state, { ...piece, on }), note: `把${furnitureLabel(catalog, piece.item)}${on ? "打開" : "關掉"}` };
+}
+/** 電視轉台：給 program 就轉到那台，沒給就照節目表轉下一台（最後一台的下一台是第一台）；關著就順便打開。 */
+export function switchChannel(state, catalog, id, program) {
+    const { piece } = findPlaced(state, id);
+    const tv = catalog[piece.item]?.tv;
+    if (!tv)
+        throw new Error(`${furnitureLabel(catalog, piece.item)}不是電視。`);
+    if (program !== undefined && !tv.programs.includes(program))
+        throw new Error(`沒有「${program}」這台，頻道有：${tv.programs.join("、")}。`);
+    const next = program ?? tv.programs[(tv.programs.indexOf(piece.program ?? "") + 1) % tv.programs.length];
+    return { state: replacePlaced(state, { ...piece, on: true, program: next }), note: piece.on ? `轉到${next}` : `打開電視，正在播${next}` };
 }
 /** 翻書抽一句：從 lines 裡抽（屋主抽籤詩＋書櫃的句子，訪客只抽籤詩）。 */
 export function readLine(state, catalog, id, lines, seed) {

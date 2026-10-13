@@ -8,8 +8,21 @@ export function restore(snapshot, content) {
     const loaded = snapshot;
     if (loaded.version !== 1)
         throw new Error(`不認得的存檔版本：${String(loaded.version)}`);
-    return { ...createInitialState(), ...migrateWorn(splitOutfits(mergeColorVariants(migrateShops(migrateRooms(loaded))), content), content), puzzle: migratePuzzle(loaded.puzzle) };
+    return { ...createInitialState(), ...migrateWorn(splitOutfits(mergeColorVariants(splitClothesColors(migrateShops(migrateRooms(loaded)))), content), content), puzzle: migratePuzzle(loaded.puzzle) };
 }
+/** 舊存檔的衣服顏色兩人共用一份（衣服代號 → 染法）：複製給兩人各一份，外觀不變。
+ *  一律寫回：舊存檔沒有這欄時兩人都沒染過，不能讓新遊戲的起始顏色蓋上去。 */
+function splitClothesColors(loaded) {
+    const colors = loaded.clothesColors ?? {};
+    if ("atone" in colors || "tsunu" in colors) { // 衣服代號不會叫 atone、tsunu：有這樣的鍵就是已經分開的
+        const personal = colors;
+        return { ...loaded, clothesColors: { atone: personal.atone ?? {}, tsunu: personal.tsunu ?? {} } };
+    }
+    const shared = colors;
+    return { ...loaded, clothesColors: { atone: { ...shared }, tsunu: { ...shared } } };
+}
+/** 兩人的衣服顏色各自照同一個規則升級。 */
+const recolorBoth = (colors, recolor) => ({ atone: recolor(colors.atone), tsunu: recolor(colors.tsunu) });
 /** 拿掉的彩色款：併進哪件灰稿、原本是什麼顏色。 */
 export const MERGED_CLOTHES = {
     casual: { into: "tee_gray", color: "#f4b3c2" },
@@ -22,15 +35,18 @@ export const MERGED_CLOTHES = {
 /** 有染色之後每種衣服只留一件灰稿：彩色款的數量併進灰稿；灰稿還沒染過色的，染成身上穿著（沒穿就是先擁有）那件彩色款的顏色，外觀不變。 */
 function mergeColorVariants(loaded) {
     const rename = (item) => (item && MERGED_CLOTHES[item]?.into) ?? item;
-    const colors = { ...loaded.clothesColors };
     const wornItems = [...Object.values(loaded.worn?.atone ?? {}), ...Object.values(loaded.worn?.tsunu ?? {}), ...Object.values(loaded.wearing ?? {}), ...Object.values(loaded.outer ?? {})];
-    for (const item of [...wornItems, ...Object.keys(loaded.wardrobe ?? {})]) {
-        const merged = item ? MERGED_CLOTHES[item] : undefined;
-        if (merged && !colors[merged.into])
-            colors[merged.into] = loaded.clothesColors?.[item] ?? merged.color;
-    }
-    for (const item of Object.keys(MERGED_CLOTHES))
-        delete colors[item];
+    const recolor = (own) => {
+        const colors = { ...own };
+        for (const item of [...wornItems, ...Object.keys(loaded.wardrobe ?? {})]) {
+            const merged = item ? MERGED_CLOTHES[item] : undefined;
+            if (merged && !colors[merged.into])
+                colors[merged.into] = own[item] ?? merged.color;
+        }
+        for (const item of Object.keys(MERGED_CLOTHES))
+            delete colors[item];
+        return colors;
+    };
     const wardrobe = {};
     for (const [item, count] of Object.entries(loaded.wardrobe ?? {}))
         wardrobe[rename(item)] = (wardrobe[rename(item)] ?? 0) + count;
@@ -38,7 +54,7 @@ function mergeColorVariants(loaded) {
     return {
         ...loaded,
         ...(loaded.wardrobe ? { wardrobe } : {}),
-        clothesColors: colors, // 一律寫回：舊存檔沒有這欄時，不能讓新遊戲的起始顏色蓋上去
+        clothesColors: recolorBoth(loaded.clothesColors, recolor),
         ...(loaded.worn ? { worn: { atone: renameAll(loaded.worn.atone), tsunu: renameAll(loaded.worn.tsunu) } } : {}),
         ...(loaded.wearing ? { wearing: renameAll(loaded.wearing) } : {}),
         ...(loaded.outer ? { outer: renameAll(loaded.outer) } : {}),
@@ -57,18 +73,23 @@ function splitOutfits(loaded, content) {
     const present = Object.keys(SPLIT_CLOTHES).filter((item) => owned.includes(item) || wornItems.includes(item));
     if (!present.length)
         return loaded;
-    const colors = { ...loaded.clothesColors };
     const wardrobe = { ...loaded.wardrobe };
     for (const item of present) {
-        for (const part of SPLIT_CLOTHES[item]) {
-            if (!colors[part.into])
-                colors[part.into] = part.color;
+        for (const part of SPLIT_CLOTHES[item])
             if (wardrobe[item])
                 wardrobe[part.into] = (wardrobe[part.into] ?? 0) + wardrobe[item];
-        }
         delete wardrobe[item];
-        delete colors[item];
     }
+    const recolor = (own) => {
+        const colors = { ...own };
+        for (const item of present) {
+            for (const part of SPLIT_CLOTHES[item])
+                if (!colors[part.into])
+                    colors[part.into] = part.color;
+            delete colors[item];
+        }
+        return colors;
+    };
     const splitWorn = (slots) => {
         const next = {};
         for (const [slot, item] of Object.entries(slots))
@@ -88,7 +109,7 @@ function splitOutfits(loaded, content) {
     return {
         ...loaded,
         ...(loaded.wardrobe ? { wardrobe } : {}),
-        clothesColors: colors,
+        clothesColors: recolorBoth(loaded.clothesColors, recolor),
         ...(loaded.worn ? { worn: { atone: splitWorn(loaded.worn.atone), tsunu: splitWorn(loaded.worn.tsunu) } } : {}),
         ...(loaded.wearing ? { wearing: renameLegacy(loaded.wearing) } : {}),
     };

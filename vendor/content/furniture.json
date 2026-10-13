@@ -368,8 +368,22 @@
     "晚間新聞",
     "自然紀錄片",
     "偶像劇",
-    "棒球轉播"
-   ]
+    "棒球轉播",
+    "恐怖片"
+   ],
+   "screens": {
+    "天氣預報": "assets/furniture/tv_on_weather.png",
+    "料理節目": "assets/furniture/tv_on_cooking.png",
+    "動物星球": "assets/furniture/tv_on_animals.png",
+    "卡通": "assets/furniture/tv_on_cartoon.png",
+    "旅遊節目": "assets/furniture/tv_on_travel.png",
+    "綜藝節目": "assets/furniture/tv_on_variety.png",
+    "晚間新聞": "assets/furniture/tv_on_news.png",
+    "自然紀錄片": "assets/furniture/tv_on_nature.png",
+    "偶像劇": "assets/furniture/tv_on_drama.png",
+    "棒球轉播": "assets/furniture/tv_on_baseball.png",
+    "恐怖片": "assets/furniture/tv_on_horror.png"
+   }
   },
   "image": "assets/furniture/tv.png",
   "anchor": {

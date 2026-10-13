@@ -454,11 +454,12 @@ export class RoomView {
     if (bottomArm.size) this.drawCharacter(bottom, time, bottomArm);
   }
 
-  /** 載入家具圖；背面圖存在 `<item>:back`、前景層 `<圖的鍵>:front`、布面遮罩 `<圖的鍵>:dye`。 */
+  /** 載入家具圖；背面圖存在 `<item>:back`、前景層 `<圖的鍵>:front`、布面遮罩 `<圖的鍵>:dye`，電視亮著的螢幕 `<item>:on`、各台畫面 `<item>:on:<節目>`。 */
   loadImage(item) {
     const spec = this.catalog[item];
     const dyeMask = (src) => (spec?.dye && src ? src.replace(/\.png(\?|$)/, "_dye.png$1") : null);   // 布面可換色的家具：旁邊放一張同名 _dye 遮罩
-    const sources = [[item, spec?.image], [`${item}:back`, spec?.back?.image], [`${item}:front`, spec?.front], [`${item}:back:front`, spec?.back?.front],[`${item}:dye`, dyeMask(spec?.image)], [`${item}:back:dye`, dyeMask(spec?.back?.image)], [`${item}:front:dye`, dyeMask(spec?.front)], [`${item}:back:front:dye`, dyeMask(spec?.back?.front)], [`${item}:blanket`, spec?.blanket], [`${item}:on`, spec?.tv?.image]];
+    const sources = [[item, spec?.image], [`${item}:back`, spec?.back?.image], [`${item}:front`, spec?.front], [`${item}:back:front`, spec?.back?.front],[`${item}:dye`, dyeMask(spec?.image)], [`${item}:back:dye`, dyeMask(spec?.back?.image)], [`${item}:front:dye`, dyeMask(spec?.front)], [`${item}:back:front:dye`, dyeMask(spec?.back?.front)], [`${item}:blanket`, spec?.blanket], [`${item}:on`, spec?.tv?.image],
+      ...Object.entries(spec?.tv?.screens ?? {}).map(([program, src]) => [`${item}:on:${program}`, src])];
     for (const [key, src] of sources) {
       if (!src || key in this.images) continue;
       const img = new Image();
@@ -1133,14 +1134,19 @@ export class RoomView {
     ctx.restore();
   }
 
+  /** 開著的電視畫哪張：這一台有自己的畫面就用它，沒有（或還沒載到）用通用的亮螢幕；都還沒載到就是 null，先畫關著的。 */
+  screenKey(piece) {
+    return [`${piece.item}:on:${piece.program}`, `${piece.item}:on`].find((key) => this.images[key]?.bounds) ?? null;
+  }
+
   /** layer："front" 只畫前景層（蓋在坐著的人身上）、"blanket" 只畫被子（蓋在躺著的人身上）；沒給就畫整件。 */
   drawPiece(piece, at, alpha, layer = null) {
     const { ctx } = this;
     const spec = this.catalog[piece.item];
     const away = this.facesAway(piece);
     const frontLayer = layer !== null;
-    const lit = !frontLayer && piece.on && spec.tv && this.images[`${piece.item}:on`]?.bounds;   // 電視開著：換成螢幕亮著的那張（還沒載到就先畫關著的）
-    const key = layer === "front" ? `${piece.item}${away ? ":back" : ""}:front` : away ? `${piece.item}:back` : lit ? `${piece.item}:on` : piece.item;
+    const lit = !frontLayer && piece.on && spec.tv && this.screenKey(piece);
+    const key = layer === "front" ? `${piece.item}${away ? ":back" : ""}:front` : away ? `${piece.item}:back` : lit || piece.item;
     const base = piece.tint && spec.dye ? this.tinted(key, piece.tint) : this.images[key];
     const image = layer === "blanket" ? this.blanketCover(piece, base) : base;
     if (frontLayer && !image?.bounds) return;   // 前景層還沒載到就先不蓋，不退回色塊
