@@ -360,7 +360,7 @@ function renderCloset() {
     const setDye = (next) => editCloset(doll, (current) => ({ colors: { ...current.colors, [wearing]: next } }));
     const pattern = dyePattern(dye);
     return [title, ...chips,
-      colorButtons(CLOTHES_COLORS, dyeBase(dye), (color) => setDye(withBase(dye, color))),
+      colorButtons(CLOTHES_COLORS, dyeBase(dye), (color) => setDye(withBase(dye, color, CLOTHES_COLORS))),
       patternRow(PATTERNS, pattern, (p) => dyeSwatch(withPattern(dye, p, CLOTHES_COLORS), paintSwatch), (p) => setDye(withPattern(dye, p, CLOTHES_COLORS))),
       ...(pattern ? [Object.assign(document.createElement("div"), { className: "wardrobe-sub", textContent: "花紋色" }), colorButtons(CLOTHES_COLORS, dye.patternColor, (color) => setDye(withPatternColor(dye, color)))] : [])];
   }));

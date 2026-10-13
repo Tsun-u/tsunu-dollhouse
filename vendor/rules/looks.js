@@ -101,8 +101,13 @@ export const patternLabel = (pattern) => PATTERNS.find((option) => option.id ===
 const dyeKey = (dye) => (dye == null ? "" : typeof dye === "string" ? dye.toLowerCase() : `${dye.color}/${dye.pattern}/${dye.patternColor}`.toLowerCase());
 /** 兩個染法一樣（物件比內容，不比參照）；null 與 undefined 都是「沒挑過」。 */
 export const sameDye = (a, b) => dyeKey(a) === dyeKey(b);
-/** 換底色，花紋留著。 */
-export const withBase = (dye, color) => (typeof dye === "string" ? color : { ...dye, color });
+/** 換底色，花紋留著；新底色跟花紋色一樣（花紋會整片看不見）時，花紋色改挑 palette 裡的對比色。 */
+export function withBase(dye, color, palette) {
+    if (typeof dye === "string")
+        return color;
+    const patternColor = sameDye(color, dye.patternColor) ? contrastColor(color, palette) : dye.patternColor;
+    return { ...dye, color, patternColor };
+}
 /** 換花紋：null 改回素色；原本是素色時，花紋色挑 palette 裡跟底色亮度差最大的。 */
 export function withPattern(dye, pattern, palette) {
     const color = dyeBase(dye);
