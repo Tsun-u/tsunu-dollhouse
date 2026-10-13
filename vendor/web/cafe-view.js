@@ -192,7 +192,7 @@ export class CafeView {
     const worn = {}, colors = {};
     const drawable = (spec) => [spec.sprites?.[wardrobe.sprites], `tpl_${spec.category}`].some((name) => name && Object.values(wardrobe.views).every((skeleton) => skeleton.data.outfits?.[name]));
     const put = (slot) => {
-      const options = Object.entries(this.clothes).filter(([, spec]) => this.dress.CATEGORY_SLOT[spec.category] === slot && (!spec.wearers || spec.wearers.includes(wardrobe.sprites)) && drawable(spec));
+      const options = Object.entries(this.clothes).filter(([, spec]) => this.dress.CATEGORY_SLOT[spec.category] === slot && !spec.ownerOnly && (!spec.wearers || spec.wearers.includes(wardrobe.sprites)) && drawable(spec));
       const [id, spec] = pick(options) ?? [];
       if (!id) return;
       worn[slot] = id;

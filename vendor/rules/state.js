@@ -770,6 +770,16 @@ function reduce(state, action, context) {
                 throw new Error("小屋自己不丟球。");
             return { state, note: throwBall(state, furniture, standingSpot(state, context).room, context.seed()) };
         }
+        case "throw_pillow": {
+            if (context.actor === "game")
+                throw new Error("小屋自己不丟枕頭。");
+            if (context.doer) { // 兒童版：娃娃的位置與睡著沒記在娃娃存檔，畫面只列同一間房醒著的娃娃
+                if (action.target === context.doer.name)
+                    throw new Error("不能丟自己。");
+                return { state, note: `用枕頭丟中${action.target}`, to: action.target };
+            }
+            return { state, note: throwPillow(state, context.actor, action.target), to: action.target };
+        }
         case "event": {
             if (context.actor !== "game")
                 throw new Error("事件只有小屋自己會發。");
@@ -1135,6 +1145,41 @@ export function throwBall(state, catalog, roomId, seed) {
         throw new Error("沒有地方可以丟。");
     const cell = spots[seed % spots.length];
     return `丟球給小黑，球滾到 (${cell.x}, ${cell.y})`;
+}
+/** 用枕頭丟人：thrower、target 是 atone、tsunu 或訪客 id；要在同一間房、兩個人都醒著。 */
+export function throwPillow(state, thrower, target) {
+    if (target === thrower)
+        throw new Error("不能丟自己。");
+    if (personAsleep(state, thrower))
+        throw new Error("你在睡覺，先起床。");
+    const targetRoom = personSpot(state, target).room;
+    const name = personName(state, target);
+    if (targetRoom !== personSpot(state, thrower).room)
+        throw new Error(`${name}不在這間房。`);
+    if (personAsleep(state, target))
+        throw new Error(`${name}睡著了，讓他睡吧。`);
+    return `用枕頭丟中${name}`;
+}
+/** 屋主睡著了沒：一起睡時兩人都睡著，一個人睡時只有那個人。 */
+function hostAsleep(state, host) {
+    return !!state.sleeping && (!state.sleeping.alone || state.sleeping.alone === host);
+}
+/** 屋裡的人站在哪：阿宇要在家、訪客要在屋裡。 */
+function personSpot(state, id) {
+    if (id === "atone")
+        return state.positions.atone;
+    if (id === "tsunu") {
+        if (!state.tsunu.home)
+            throw new Error("阿宇不在家。");
+        return state.positions.tsunu;
+    }
+    const visitor = state.visitors?.[id];
+    if (!visitor)
+        throw new Error("屋裡沒有這位客人。");
+    return visitor.spot;
+}
+function personAsleep(state, id) {
+    return id === "atone" || id === "tsunu" ? hostAsleep(state, id) : !!state.visitors?.[id]?.asleep;
 }
 /** 睡了多久：不到一小時寫分鐘（至少 1 分鐘），之後寫到小數一位的小時。 */
 export function sleepLength(since, now) {

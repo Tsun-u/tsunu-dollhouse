@@ -4,7 +4,7 @@
 
 /** 衣服大類穿在哪一格（跟伺服器 src/catalog.ts 的 CATEGORY_SLOT 同一組）。 */
 export const CATEGORY_SLOT = {
-  camisole: "innerTop", tee: "top", tank: "top", hoodie: "top", shirt: "top", pajama_top: "top", dress: "top", coat: "coat", apron: "wrap", cape: "wrap", scarf: "wrap",
+  camisole: "innerTop", tee: "top", tank: "top", hoodie: "top", shirt: "top", pajama_top: "top", boyfriend_shirt: "top", dress: "top", coat: "coat", apron: "wrap", cape: "wrap", scarf: "wrap",
   leggings: "leggings", tights: "leggings", shorts: "bottom", pants: "bottom", wide_pants: "bottom", pajama_pants: "bottom", skirt: "bottom", pinafore: "overskirt", overalls: "overskirt", socks: "socks", shoes: "shoes", bowtie: "accessory", tie: "accessory",
 };
 export const SLOT_LABEL = { innerTop: "內搭衣", top: "上衣", coat: "外套", wrap: "罩衫", leggings: "內搭褲", bottom: "下衣", overskirt: "罩裙", socks: "襪子", shoes: "鞋子", accessory: "飾品" };
@@ -12,7 +12,7 @@ export const SLOT_LABEL = { innerTop: "內搭衣", top: "上衣", coat: "外套"
 /** 由底到頂的畫法：上衣紮進下衣（tucked）就畫在下衣底下，不紮的（T 恤）畫在下衣上面；罩裙在外套底下；鞋子在下衣底下，褲管才蓋得住鞋口；
  *  飾品（蝴蝶結、領帶）蓋在上衣和罩裙上、敞開的外套底下。 */
 const UPPER_SLOTS = new Set(["innerTop", "top", "coat", "wrap", "accessory"]);
-const HIP_CATEGORIES = new Set(["dress"]);   // 放在上衣格、但連裙子一起蓋到下半身
+const HIP_CATEGORIES = new Set(["dress", "boyfriend_shirt"]);   // 放在上衣格、但下襬一路蓋到大腿
 const TUCKED_ORDER = ["leggings", "socks", "shoes", "innerTop", "top", "bottom", "overskirt", "accessory", "coat", "wrap"];
 const UNTUCKED_ORDER = ["leggings", "socks", "shoes", "innerTop", "bottom", "top", "overskirt", "accessory", "coat", "wrap"];
 

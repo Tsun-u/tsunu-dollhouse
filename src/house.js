@@ -135,7 +135,8 @@ export class House {
     const entry = this.deps.apply(action, { name: doll.name, spot: doll.spot });
     if (!entry) return;
     const watchers = [...this.people.values()].filter((who) => who.room === this.roomId);   // 小黑撿完球跑回他們身邊
-    this.play(this.personFor(doll), entry.text, { spot: doll.spot, watchers });
+    const target = entry.to && this.people.get(this.deps.dolls().dolls.find((other) => other.name === entry.to)?.id);   // 被丟枕頭的娃娃
+    this.play(this.personFor(doll), entry.text, { spot: doll.spot, watchers, target });
   }
 
   /** 家具（洗手台、爐台）旁邊、這個娃娃站得進去又沒有別人的格子裡離 from 最近的那格；from 已經緊鄰就是 from；沒有就 null。 */
@@ -331,10 +332,12 @@ export class House {
     $("dollPanelTitle").textContent = `${doll.name}可以……`;
     const catalog = this.deps.content.furniture;
     const seatOf = (d) => seatAt(this.room.home, d.spot, catalog);
+    const asleep = (d) => d.asleep || (!!this.sleepingOn && seatOf(d)?.id === this.sleepingOn);
     const actions = [button("揮手", () => this.wave(doll.id))];
     for (const other of others) {
       const washing = this.washing(doll) || this.washing(other);
       if (!washing) actions.push(button(`抱抱${other.name}`, () => this.hug(doll, other)));
+      if (!asleep(doll) && !asleep(other)) actions.push(button(`用枕頭丟${other.name}`, () => this.act({ kind: "throw_pillow", target: other.name })));
       const seat = seatOf(other);
       const together = seat && seatOf(doll)?.id === seat.id;
       if (seat && !together && !washing && !catalog[seat.item]?.toilet) actions.push(button(`坐到${other.name}旁邊`, () => this.sitBeside(doll, other, seat)));

@@ -105,6 +105,7 @@ export class RoomView {
     this.drag = null;
     this.images = {};
     this.characters = [];   // { name, skeleton, animations, anim, cell }
+    this.effects = [];      // 一次性的演出（飛出去的枕頭、飄的羽毛）：{ until, draw(ctx, now) }，蓋在人物上面，時間到就拿掉
     this.animating = false;
     canvas.addEventListener("pointerdown", (e) => this.onDown(e));
     canvas.addEventListener("pointermove", (e) => this.onMove(e));
@@ -836,8 +837,21 @@ export class RoomView {
     this.drawSteam(time);
     this.drawNight();
     this.drawHearts();
+    this.drawEffects();
     this.drawMarkers();
     this.drawBubbles();   // 對話框永遠在最上面
+  }
+
+  drawEffects() {
+    const now = performance.now();
+    this.effects = this.effects.filter((effect) => now < effect.until);
+    for (const effect of this.effects) effect.draw(this.ctx, now);
+  }
+
+  /** 人物頭頂在畫面上的位置（躺著的頭比較低）。 */
+  headTop(who) {
+    const [sx, sy] = this.drawnSpot(who);
+    return [sx, sy - (lying(who) ? SLEEP_Z_LIFT : CHARACTER_HEIGHT)];
   }
 
   /** 標了 marker 的人（訪客頁的自己）頭上一個上下輕晃的小三角：一屋子人時找得到自己。 */
@@ -845,8 +859,8 @@ export class RoomView {
     const { ctx } = this;
     for (const who of this.characters) {
       if (!who.marker || !who.pos) continue;
-      const [sx, sy] = this.drawnSpot(who);
-      const y = sy - (lying(who) ? SLEEP_Z_LIFT : CHARACTER_HEIGHT) - 6 + Math.sin(performance.now() / 300) * 2;
+      const [sx, top] = this.headTop(who);
+      const y = top - 6 + Math.sin(performance.now() / 300) * 2;
       ctx.save();
       ctx.fillStyle = "#d98a5c"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(sx - 6, y - 9); ctx.lineTo(sx + 6, y - 9); ctx.lineTo(sx, y); ctx.closePath();
