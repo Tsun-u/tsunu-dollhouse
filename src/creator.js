@@ -12,6 +12,7 @@ const $ = (id) => document.getElementById(id);
 
 export function setupCreator({ skeletons, animations, samplePose, clothes, dressUp, onSave, onCancel, takenNames = () => [] }) {
   let draft = null, isNew = false, view = "front34";
+  let drawnName = null;   // 辭典抽的名字；名字還是它的時候換身體就跟著換一個男生／女生的名字
 
   const skeletonOf = (body, v) => skeletons[BODIES[body].views[v]];
   const outfitsOf = (body) => skeletonOf(body, "front").data.outfits ?? {};
@@ -53,11 +54,11 @@ export function setupCreator({ skeletons, animations, samplePose, clothes, dress
     const highlightable = Boolean(hairOption?.highlight && outfitsOf(draft.body)[hairOption.highlight]);   // 這款髮型有畫挑染位置
     const name = Object.assign(document.createElement("input"), { id: "dollName", value: draft.name, maxLength: 12, placeholder: "取個名字" });
     name.oninput = () => { draft.name = name.value; };
-    const reroll = iconButton("dice", "換一個名字", () => { draft.name = drawName(takenNames(draft.id), draft.name.trim() || null); name.value = draft.name; });
+    const reroll = iconButton("dice", "換一個名字", () => { draft.name = drawnName = drawName(draft.body, takenNames(draft.id), draft.name.trim() || null); name.value = draft.name; });
     $("creatorOptions").replaceChildren(
       group("名字", row("name-row", [name, reroll])),
       group("看哪一面", row("chips", Object.entries(VIEW_LABELS).map(([id, label]) => chip(label, view === id, () => { view = id; render(); })))),
-      group("身體", row("chips", Object.entries(BODIES).map(([id, body]) => chip(body.label, draft.body === id, () => set(fitToBody({ ...draft, body: id })))))),
+      group("身體", row("chips", Object.entries(BODIES).map(([id, body]) => chip(body.label, draft.body === id, () => set(fitToBody({ ...draft, body: id, name: draft.name === drawnName && id !== draft.body ? (drawnName = drawName(id, takenNames(draft.id))) : draft.name })))))),
       group("膚色", swatchRow(SKIN_TONES, draft.skin, (skin) => set({ skin }))),
       group("髮型", row("chips", options(HAIRS, draft.body).map((h) => chip(h.label, draft.hair === h.id, () => set({ hair: h.id }))))),
       group("髮色", swatchRow(HAIR_COLORS, draft.hairColor, (hairColor) => set({ hairColor }))),
@@ -95,7 +96,7 @@ export function setupCreator({ skeletons, animations, samplePose, clothes, dress
   })(performance.now());
 
   $("creatorSave").replaceChildren(iconButton("check", "好了", () => {
-    onSave({ ...draft, name: draft.name.trim() || drawName(takenNames(draft.id)) }, isNew);   // 沒取名字就從辭典抽一個
+    onSave({ ...draft, name: draft.name.trim() || drawName(draft.body, takenNames(draft.id)) }, isNew);   // 沒取名字就從辭典抽一個
     $("creatorBox").hidden = true;
   }, "big"));
   $("creatorCancel").replaceChildren(iconButton("cross", "取消", () => { $("creatorBox").hidden = true; onCancel?.(); }, "big"));
@@ -104,7 +105,8 @@ export function setupCreator({ skeletons, animations, samplePose, clothes, dress
     /** doll 為 null 是新增；first 為 true 是第一個娃娃（不能取消）。 */
     open(doll, { first = false } = {}) {
       isNew = !doll;
-      draft = doll ? { ...doll } : fitToBody(createDoll({ name: drawName(takenNames(null)), body: "f" }));
+      drawnName = doll ? null : drawName("f", takenNames(null));
+      draft = doll ? { ...doll } : fitToBody(createDoll({ name: drawnName, body: "f" }));
       $("creatorTitle").textContent = first ? "先捏一個娃娃住進家裡" : isNew ? "新增娃娃" : `修改${doll.name}`;
       $("creatorCancel").hidden = first;
       $("creatorBox").hidden = false;
