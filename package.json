@@ -3,6 +3,6 @@
  "private": true,
  "type": "module",
  "scripts": {
-  "test": "node --test test/game.test.js test/dolls.test.js test/save-file.test.js test/syntax.test.js"
+  "test": "node --test test/game.test.js test/dolls.test.js test/names.test.js test/save-file.test.js test/syntax.test.js"
  }
 }

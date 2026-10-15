@@ -14,11 +14,13 @@ import { dyeSwatch, patternRow } from "../vendor/web/swatches.js";
 import { WorkshopView } from "../vendor/web/workshop-view.js";
 import { startCafeClock } from "./cafe-clock.js";
 import { setupCreator } from "./creator.js";
-import { addDoll, loadDolls, randomShopkeeper, removeDoll, saveDolls, updateDoll } from "./dolls.js";
+import { MAX_DOLLS, addDoll, loadDolls, randomShopkeeper, removeDoll, saveDolls, updateDoll } from "./dolls.js";
 import { createGame, loadContent } from "./game.js";
 import { House } from "./house.js";
 import { downloadSave, uploadSave } from "./drive-save.js";
 import { checkSave, exportSave, readSave, saveData } from "./save-file.js";
+import { createThumbs, thumbImage, trimmedImage } from "./thumbs.js";
+import { confirmable, icon, iconButton, onConfirmChange, price } from "./ui.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -40,6 +42,7 @@ const animations = await (await fetch(`vendor/player/animations.json${bust}`)).j
 const skeletonNames = [...new Set(Object.values(BODIES).flatMap((body) => Object.values(body.views)))];
 const skeletons = Object.fromEntries(await Promise.all(skeletonNames.map(async (name) => [name, await loadSkeleton(`vendor/player/skeleton_${name}.json${bust}`, "vendor/player/assets/", bust)])));
 
+const thumbs = createThumbs({ skeletons, animations, samplePose, clothes: content.clothes, dressUp });
 const storage = browserStorage();
 const game = createGame(content, storage);
 let dollsSave = loadDolls(storage, content.clothes);
@@ -108,13 +111,11 @@ const street = new StreetView($("streetCanvas"), {
   onHome: () => showTab("home"),
 });
 $("cafeToggle").onclick = () => apply({ kind: "shop_open", open: !game.state.shops[viewingShop].open, shop: viewingShop });
-$("rentCancel").onclick = () => { $("rentPanel").hidden = true; };
 
 /** 店內裝潢：點裝飾點的小刷子，列出三款風格（買過的「換上」、正在用的亮著）和原裝。 */
 let decorSpot = null;
 cafe.decor = content.decor;
 cafe.onDecor = (spot) => { decorSpot = spot; renderDecorPanel(); };
-$("decorClose").onclick = () => { decorSpot = null; $("decorPanel").hidden = true; };
 function renderDecorPanel() {
   const { state } = game;
   const shop = state.shops[viewingShop];
@@ -123,18 +124,18 @@ function renderDecorPanel() {
   const owned = shop.decor?.owned?.[decorSpot] ?? [];
   const chosen = shop.decor?.chosen?.[decorSpot] ?? null;
   const name = content.decor.shops[viewingShop]?.[decorSpot] ?? spec.label;
-  $("decorPanelTitle").textContent = `${SHOP_LABEL[viewingShop]}的${name}（存款 $${state.money}）`;
-  const choice = (text, theme, action, disabled = false) => {
-    const b = Object.assign(document.createElement("button"), { textContent: text, disabled, onclick: () => apply(action) });
-    if (theme === chosen) b.className = "chosen";
-    return b;
-  };
-  $("decorChoices").replaceChildren(
-    choice("原裝", null, { kind: "set_decor", shop: viewingShop, spot: decorSpot, theme: null }, chosen === null),
-    ...Object.entries(content.decor.themes).map(([theme, label]) => owned.includes(theme)
-      ? choice(theme === chosen ? `${label}（使用中）` : `${label}：換上`, theme, { kind: "set_decor", shop: viewingShop, spot: decorSpot, theme }, theme === chosen)
-      : choice(`${label}：買 $${spec.price}`, theme, { kind: "buy_decor", shop: viewingShop, spot: decorSpot, theme }, state.money < spec.price)),
-  );
+  $("decorPanelTitle").replaceChildren(icon("brush"), `${SHOP_LABEL[viewingShop]}的${name}`);
+  const art = (theme) => (decorSpot === "hanging" ? `assets/decor/hanging_${theme}.png` : `assets/decor/${viewingShop}/${decorSpot}_${theme}.png`);
+  // 用中的打勾、買過的點一下就換上、沒買過的要花錢（點兩下）；原裝是一張空白卡加復原圖示
+  const original = itemCard(icon("undo"), "原裝", ...(chosen === null ? [usingMark()] : []));
+  original.classList.toggle("on", chosen === null);
+  original.disabled = chosen === null;
+  original.onclick = () => apply({ kind: "set_decor", shop: viewingShop, spot: decorSpot, theme: null });
+  $("decorChoices").replaceChildren(original, ...Object.entries(content.decor.themes).map(([theme, label]) => {
+    if (theme === chosen) { const card = itemCard(art(theme), label, usingMark()); card.classList.add("on"); card.disabled = true; return card; }
+    if (owned.includes(theme)) { const card = itemCard(art(theme), label); card.onclick = () => apply({ kind: "set_decor", shop: viewingShop, spot: decorSpot, theme }); return card; }
+    return payCard(itemCard(art(theme), label, price(spec.price)), `decor:${viewingShop}:${decorSpot}:${theme}`, spec.price, () => apply({ kind: "buy_decor", shop: viewingShop, spot: decorSpot, theme }));
+  }));
   $("decorPanel").hidden = false;
 }
 
@@ -142,24 +143,39 @@ function renderDecorPanel() {
 function openRent(lot) {
   const { state } = game;
   const choices = Object.entries(SHOP_RENT).filter(([kind]) => !state.shops[kind]);
-  $("rentTitle").textContent = choices.length ? `${lot === "left" ? "左邊" : "右邊"}的店面出租中，要開哪家店？（存款 $${state.money}）` : "兩家店都開了。";
-  $("rentChoices").replaceChildren(...choices.map(([kind, rent]) => Object.assign(document.createElement("button"), {
-    textContent: `開${SHOP_LABEL[kind]}（租金 $${rent}）`, disabled: state.money < rent,
-    onclick: () => { $("rentPanel").hidden = true; if (apply({ kind: "rent_shop", lot, shop: kind })) { viewingShop = kind; cafe.setShop(kind); renderCafe(); } },
+  $("rentTitle").replaceChildren(icon("street"), choices.length ? `開哪家店？` : "兩家店都開了。");
+  $("rentChoices").replaceChildren(...choices.map(([kind, rent]) => payCard(itemCard(`assets/street/sign_${kind}.png`, SHOP_LABEL[kind], price(rent)), `rent:${lot}:${kind}`, rent, () => {
+    $("rentPanel").hidden = true;
+    if (apply({ kind: "rent_shop", lot, shop: kind })) { viewingShop = kind; cafe.setShop(kind); renderCafe(); }
   })));
   $("rentPanel").hidden = false;
 }
 
-/** 分頁：切到咖啡廳時從娃娃裡隨機抽一位顧店。 */
+/** 分頁按鈕：大圖示＋小字（字給大人看）。 */
+const TAB_ICONS = { home: "home", puzzle: "puzzle", workshop: "workshop", closet: "closet", cafe: "street", shop: "shop", dolls: "dolls" };
+for (const tabButton of $("tabs").children) {
+  const label = tabButton.textContent;
+  tabButton.setAttribute("aria-label", label);
+  tabButton.replaceChildren(icon(TAB_ICONS[tabButton.dataset.tab]), Object.assign(document.createElement("span"), { className: "tab-label", textContent: label }));
+}
+for (const heading of document.querySelectorAll("h2.section[data-icon]")) heading.prepend(icon(heading.dataset.icon));
+$("saveSummary").prepend(icon("box"));
+$("flipBtn").append(icon("rotate"));
+$("storeBtn").append(icon("box"));
+$("rentCancel").replaceChildren(iconButton("cross", "先不要", () => { $("rentPanel").hidden = true; }));
+$("decorClose").replaceChildren(iconButton("cross", "關閉", () => { decorSpot = null; $("decorPanel").hidden = true; }));
+
+/** 分頁：切到咖啡廳時從娃娃裡隨機抽一位顧店；進衣櫃時從頭記「可以復原到哪一套」。 */
 for (const tabButton of $("tabs").children) {
   const show = () => {
     for (const b of $("tabs").children) b.classList.toggle("on", b === tabButton);
     for (const tab of document.querySelectorAll(".tab")) tab.classList.toggle("on", tab.id === tabButton.dataset.tab);
     if (tabButton.dataset.tab === "cafe") pickShopkeeper();
+    if (tabButton.dataset.tab === "closet") { closetOrigin = null; renderCloset(); }
     fitScenes();
     if (tabButton.dataset.tab === "home") house.room.draw();
   };
-  tabButton.onclick = () => ($("closet").classList.contains("on") && tabButton.dataset.tab !== "closet" ? leaveCloset(show) : show());
+  tabButton.onclick = show;
 }
 
 function showTab(id) {
@@ -195,41 +211,108 @@ window.addEventListener("resize", fitScenes);
 
 // ───────── 家具店 ─────────
 
-/** 家具店的裝潢這間房：選取的娃娃所在那間房的地板與壁紙，使用中的亮著。 */
-function renderRoomDecor(chip) {
+/** 地板、壁紙的小樣：照目錄的花紋和顏色用 CSS 畫一塊。 */
+function surfaceSample(spec) {
+  const [a, b = a, c = b] = spec.colors;
+  const accent = spec.accent ?? spec.line ?? b;
+  const backgrounds = {
+    checker: `repeating-conic-gradient(${a} 0 25%, ${b} 0 50%) 0 0 / 50% 50%`,
+    planks: `repeating-linear-gradient(90deg, ${a} 0 30%, ${b} 30% 32%, ${c} 32% 64%, ${spec.line} 64% 66%)`,
+    stripes: `repeating-linear-gradient(90deg, ${a} 0 22%, ${accent} 22% 34%)`,
+    dots: `radial-gradient(${accent} 18%, transparent 20%) 0 0 / 33% 33%, ${a}`,
+    wainscot: `linear-gradient(${a} 0 55%, ${accent} 55% 58%, ${b} 58%)`,
+    baseboard: `linear-gradient(${a} 0 80%, ${accent} 80%)`,
+  };
+  const sample = Object.assign(document.createElement("span"), { className: "thumb surface" });
+  sample.style.background = backgrounds[spec.pattern] ?? `linear-gradient(${a}, ${b})`;
+  return sample;
+}
+
+/** 家具縮圖：裁掉透明邊的家具圖；目錄沒有圖的用它的代表色畫一塊。圖裁好時整頁合併成下一幀重畫一次。 */
+let renderQueued = false;
+const renderSoon = () => { if (!renderQueued) { renderQueued = true; requestAnimationFrame(() => { renderQueued = false; renderAll(); }); } };
+function furnitureThumb(spec) {
+  if (spec.image) return trimmedImage(spec.image, renderSoon);
+  const block = Object.assign(document.createElement("span"), { className: "thumb surface" });
+  block.style.background = spec.color;
+  return block;
+}
+
+/** 卡片的狀態：買不起（灰淡）、用中（綠勾）、有幾個（角落數字）分開表示。 */
+function badge(text) { return Object.assign(document.createElement("span"), { className: "count-badge", textContent: text }); }
+function usingMark() { const mark = icon("check"); mark.classList.add("using-mark"); return mark; }
+
+/** 要花錢（或賣掉）的卡：買不起就灰掉不能點，買得起要點兩下（選中、再點勾勾）。 */
+function payCard(card, key, cost, onConfirm) {
+  if (cost > game.state.money) { card.disabled = true; card.classList.add("poor"); return card; }
+  return confirmable(card, key, "go", onConfirm);
+}
+
+/** 家具店的裝潢這間房：選取的娃娃所在那間房的地板與壁紙，使用中的打勾。 */
+function renderRoomDecor() {
   const { state } = game;
   const here = state.rooms[house.roomId] ? house.roomId : "bedroom";
   const current = state.rooms[here];
-  $("decorTitle").textContent = `裝潢${current.name}（娃娃走到別間房就能裝潢那間）`;
+  $("decorTitle").textContent = `${current.name}的地板`;
   const row = (kind, list, fallback) => Object.entries(list).map(([id, spec]) => {
     const using = (current[kind] ?? fallback) === id;
-    const choice = chip(`${spec.label}<span class="price">${using ? "使用中" : spec.price ? `$${spec.price}` : "免費"}</span>`, using || state.money < spec.price, () => apply({ kind: "decorate_room", room: here, [kind]: id }));
-    choice.classList.toggle("on", using);
-    return choice;
+    const card = itemCard(surfaceSample(spec), spec.label, ...(using ? [usingMark()] : [price(spec.price)]));
+    if (using) { card.classList.add("on"); card.disabled = true; return card; }
+    return payCard(card, `${kind}:${here}:${id}`, spec.price, () => apply({ kind: "decorate_room", room: here, [kind]: id }));
   });
   $("floorList").replaceChildren(...row("floor", content.surfaces.floors, "tile"));
   $("wallList").replaceChildren(...row("wall", content.surfaces.walls, "plain"));
 }
 
+/** 蓋房間的小圖：屋子圖示加上房間的格數畫成小方格。 */
+function roomSample(spec) {
+  const box = Object.assign(document.createElement("span"), { className: "thumb room-sample" });
+  const grid = Object.assign(document.createElement("span"), { className: "room-grid" });
+  grid.style.gridTemplateColumns = `repeat(${spec.width}, 1fr)`;
+  grid.style.aspectRatio = `${spec.width} / ${spec.depth}`;
+  grid.append(...Array.from({ length: spec.width * spec.depth }, () => document.createElement("i")));
+  box.append(icon("build"), grid);
+  return box;
+}
+
+/** 選中的娃娃（家具店的衣服縮圖照她的素體畫）。 */
+const shopperDoll = () => dollsSave.dolls.find((d) => d.id === dollsSave.selected) ?? dollsSave.dolls[0];
+
+/** 衣櫃裡比穿著它的娃娃多的才能賣（基本款每個娃娃都有，不算）。 */
+function sellableClothes() {
+  const wearers = (item) => dollsSave.dolls.filter((d) => Object.values(d.worn).includes(item) && !Object.values(BODIES[d.body].starter).includes(item)).length;
+  return Object.entries(game.state.wardrobe).filter(([item, count]) => content.clothes[item] && count > wearers(item));
+}
+
 function renderShop() {
   const { state } = game;
-  $("shopMoney").textContent = `錢：$${state.money}。買到的家具進倉庫。`;
-  const chip = (html, disabled, onclick) => Object.assign(document.createElement("button"), { className: "item", innerHTML: html, disabled, onclick });
-  const swatch = (color) => `<span class="swatch" style="background:${color}"></span>`;
-  $("shopList").replaceChildren(...Object.entries(content.furniture).map(([item, spec]) =>
-    chip(`${swatch(spec.color)}${spec.label}<span class="price">$${spec.price}</span>`, state.money < spec.price, () => apply({ kind: "buy", item }))));
+  $("shopMoney").replaceChildren();   // 錢已經在最上面，這行只留給錯誤訊息
+  const doll = shopperDoll();
+  $("shopList").replaceChildren(...Object.entries(content.furniture).map(([item, spec]) => {
+    const card = itemCard(furnitureThumb(spec), spec.label, price(spec.price), ...(state.inventory[item] ? [badge(`×${state.inventory[item]}`)] : []));
+    return payCard(card, `buy:${item}`, spec.price, () => apply({ kind: "buy", item }));
+  }));
+  $("clothesShop").replaceChildren(...(doll ? Object.entries(content.clothes).map(([item, spec]) => {
+    const card = itemCard(thumbs.clothes(item, doll, spec.color), spec.label, price(spec.price), ...(state.wardrobe[item] ? [badge(`×${state.wardrobe[item]}`)] : []));
+    return payCard(card, `buyc:${item}`, spec.price, () => apply({ kind: "buy_clothes", item }));
+  }) : []));
   const unbuilt = Object.entries(content.rooms).filter(([id]) => !state.rooms[id]);
   $("buildList").replaceChildren(...unbuilt.map(([id, spec]) =>
-    chip(`蓋${spec.label}（${spec.width}×${spec.depth}）<span class="price">$${spec.price}</span>`, state.money < spec.price, () => apply({ kind: "build_room", room: id }))));
-  if (!unbuilt.length) $("buildList").textContent = "能蓋的房間都蓋好了。";
-  renderRoomDecor(chip);
-  $("clothesShop").replaceChildren(...Object.entries(content.clothes).map(([item, spec]) =>
-    chip(`${swatch(spec.color)}${spec.label}<span class="price">$${spec.price}</span>`, state.money < spec.price, () => apply({ kind: "buy_clothes", item }))));
-  $("resaleList").replaceChildren(...Object.entries(state.inventory).map(([item, count]) => {
-    const spec = content.furniture[item];
-    return chip(`${swatch(spec.color)}${spec.label}<span class="count">×${count}</span><span class="price">$${Math.floor(spec.price / 2)}</span>`, false, () => apply({ kind: "sell_furniture", item }));
-  }));
-  if (!$("resaleList").children.length) $("resaleList").textContent = "倉庫是空的。";
+    payCard(itemCard(roomSample(spec), spec.label, price(spec.price)), `build:${id}`, spec.price, () => apply({ kind: "build_room", room: id }))));
+  $("buildList").previousElementSibling.hidden = $("buildList").hidden = !unbuilt.length;
+  renderRoomDecor();
+  const sellCard = (card, key, onConfirm) => { card.classList.add("selling"); return confirmable(card, key, "go", onConfirm); };
+  $("resaleList").replaceChildren(
+    ...Object.entries(state.inventory).map(([item, count]) => {
+      const spec = content.furniture[item];
+      return sellCard(itemCard(furnitureThumb(spec), spec.label, price(Math.floor(spec.price / 2)), badge(`×${count}`)), `sellf:${item}`, () => apply({ kind: "sell_furniture", item }));
+    }),
+    ...(doll ? sellableClothes().map(([item, count]) => {
+      const spec = content.clothes[item];
+      return sellCard(itemCard(thumbs.clothes(item, doll, spec.color), spec.label, price(Math.floor(spec.price / 2)), badge(`×${count}`)), `sellc:${item}`, () => apply({ kind: "sell_clothes", item }));
+    }) : []),
+  );
+  $("resaleList").previousElementSibling.hidden = $("resaleList").hidden = !$("resaleList").children.length;
 }
 
 // ───────── 咖啡廳 ─────────
@@ -243,7 +326,10 @@ function renderCafe() {
   const waiting = shop.customers.length;
   const keeper = $("cafeInfo").dataset.keeper ? `今天${$("cafeInfo").dataset.keeper}顧店。` : "";
   $("cafeInfo").textContent = keeper + (shop.open ? (waiting ? `${label}：${waiting} 位客人在等，累計服務 ${shop.served} 人` : `${label}開著，等客人上門（累計服務 ${shop.served} 人）`) : `${label}打烊中`);
-  $("cafeToggle").textContent = shop.open ? "打烊" : "開門";
+  $("cafeToggle").replaceChildren(icon(shop.open ? "moon" : "sun"));
+  $("cafeToggle").className = `icon-btn big ${shop.open ? "closing" : "opening"}`;
+  $("cafeToggle").title = shop.open ? "打烊" : "開門";
+  $("cafeToggle").setAttribute("aria-label", $("cafeToggle").title);
   $("cafeProductsHint").textContent = viewingShop === "boutique" ? "櫃台上的衣服（點客人就賣出；想自己穿就收進衣櫃）" : "櫃台上的商品（點客人就出餐）";
   const mine = Object.entries(state.products).filter(([chain]) => (content.recipes[chain]?.shop ?? "cafe") === viewingShop);
   $("cafeProducts").replaceChildren(...mine.map(([chain, count]) => {
@@ -252,7 +338,7 @@ function renderCafe() {
     const icon = Object.assign(document.createElement("span"), { className: "icon" });
     icons.apply(icon, chain, (recipe?.tiers.length ?? 1) - 1);
     chip.append(icon, `${recipe?.tiers.at(-1) ?? chain} ×${count}`);
-    if (recipe?.clothes) chip.append(Object.assign(document.createElement("button"), { className: "quiet", textContent: "收進衣櫃", onclick: () => apply({ kind: "keep_clothes", chain }) }));
+    if (recipe?.clothes) chip.append(iconButton("closet", "收進衣櫃", () => apply({ kind: "keep_clothes", chain })));
     return chip;
   }));
   if (!mine.length) $("cafeProducts").textContent = "櫃台空空的，去工坊做點東西。";
@@ -267,103 +353,94 @@ function renderCafe() {
 // ───────── 衣櫃：幫娃娃換衣服（衣服從遊戲存檔的衣櫃挑，穿在娃娃存檔） ─────────
 
 let closetWho = null;
-/** 衣櫃的試穿草稿：點衣服、換色都只改這份（{ id, worn, colors }），按存檔才寫進娃娃；null 是沒在試穿。 */
-let closetDraft = null;
-
-/** 衣櫃現在畫的樣子：在試穿這個娃娃就是草稿，不然照娃娃身上的。 */
-function closetLook(doll) {
-  return closetDraft?.id === doll.id ? closetDraft : { id: doll.id, worn: { ...doll.worn }, colors: { ...(doll.colors ?? {}) } };
-}
+/** 進衣櫃（或換人）後第一次改衣服前的樣子（{ id, worn, colors }），↩ 復原回到這套；null 是還沒改過。 */
+let closetOrigin = null;
 
 /** 兩份「格子 → 衣服」或「衣服 → 染法」一樣；same 比兩個值（染法用 sameDye 比內容）。 */
 const sameEntries = (a, b, same = (x, y) => x === y) => [...new Set([...Object.keys(a), ...Object.keys(b)])].every((key) => same(a[key], b[key]));
 
-/** 草稿跟娃娃身上的不一樣：有東西要存。 */
-function closetChanged() {
-  const doll = closetDraft && dollsSave.dolls.find((d) => d.id === closetDraft.id);
-  return !!doll && !(sameEntries(doll.worn, closetDraft.worn) && sameEntries(doll.colors ?? {}, closetDraft.colors, sameDye));
-}
-
+/** 點了就穿上：直接寫進娃娃，第一次改之前先記下原本那套。 */
 function editCloset(doll, change) {
-  const current = closetLook(doll);
-  closetDraft = { ...current, ...change(current) };
-  renderCloset();
+  const current = { worn: { ...doll.worn }, colors: { ...(doll.colors ?? {}) } };
+  if (closetOrigin?.id !== doll.id) closetOrigin = { id: doll.id, ...current };
+  setDolls({ ...dollsSave, dolls: updateDoll(dollsSave.dolls, doll.id, change(current)) });
 }
 
-function saveCloset() {
-  if (closetChanged()) setDolls({ ...dollsSave, dolls: updateDoll(dollsSave.dolls, closetDraft.id, { worn: closetDraft.worn, colors: closetDraft.colors }) });
-  closetDraft = null;
-  renderCloset();
+function undoCloset() {
+  if (!closetOrigin) return;
+  const { id, worn, colors } = closetOrigin;
+  closetOrigin = null;
+  setDolls({ ...dollsSave, dolls: updateDoll(dollsSave.dolls, id, { worn, colors }) });
 }
 
-function discardCloset() {
-  closetDraft = null;
-  renderCloset();
+/** 這個娃娃跟進衣櫃時穿的不一樣：↩ 才有東西可以復原。 */
+function closetChanged(doll) {
+  return closetOrigin?.id === doll.id && !(sameEntries(doll.worn, closetOrigin.worn) && sameEntries(doll.colors ?? {}, closetOrigin.colors, sameDye));
 }
 
-/** 要離開衣櫃（切分頁、換娃娃）時：草稿沒存就先問存檔、放棄、繼續試穿，選了存檔或放棄才接著 proceed。 */
-function leaveCloset(proceed) {
-  if (!closetChanged()) { closetDraft = null; proceed(); return; }
-  const dialog = $("closetLeave");
-  dialog.onclick = (event) => {
-    const choice = event.target.dataset?.choice;
-    if (!choice) return;
-    dialog.close();
-    if (choice === "stay") return;
-    if (choice === "save") saveCloset(); else discardCloset();
-    proceed();
-  };
-  dialog.showModal();
+/** 選娃娃的頭像按鈕（衣櫃、娃娃分頁共用的樣子）。 */
+function faceButton(doll, on, onclick) {
+  const button = Object.assign(document.createElement("button"), { className: "who" + (on ? " on" : ""), onclick, type: "button" });
+  button.setAttribute("aria-label", doll.name);
+  button.append(thumbImage(thumbs.face(doll), "face"), Object.assign(document.createElement("span"), { className: "who-name", textContent: doll.name }));
+  return button;
 }
-$("closetSaveBtn").onclick = saveCloset;
-$("closetDiscardBtn").onclick = discardCloset;
 
 function renderCloset() {
   const dolls = dollsSave.dolls;
   if (!dolls.some((doll) => doll.id === closetWho)) closetWho = dollsSave.selected ?? dolls[0]?.id ?? null;
-  $("closetWho").replaceChildren(...dolls.map((doll) => {
-    const chip = Object.assign(document.createElement("button"), { className: "item" + (doll.id === closetWho ? " on" : ""), textContent: doll.name });
-    chip.onclick = () => leaveCloset(() => { closetWho = doll.id; renderCloset(); });
-    return chip;
-  }));
+  $("closetWho").replaceChildren(...dolls.map((doll) => faceButton(doll, doll.id === closetWho, () => { closetWho = doll.id; closetOrigin = null; renderCloset(); })));
   const doll = dolls.find((d) => d.id === closetWho);
-  $("closetSave").hidden = !closetChanged();
+  $("closetUndo").replaceChildren(...(doll && closetChanged(doll) ? [iconButton("undo", "變回原本那套", undoCloset, "big")] : []));
   if (!doll) return;
-  const { worn, colors } = closetLook(doll);
+  const { worn } = doll;
+  const colors = doll.colors ?? {};
   const starter = Object.values(BODIES[doll.body].starter);   // 基本款每個娃娃都有
   const wearable = (item) => content.clothes[item] && (!content.clothes[item].wearers || content.clothes[item].wearers.includes(BODIES[doll.body].sprites));   // 男生、女生素體各有各的衣服
   const items = [...new Set([...starter, ...Object.keys(game.state.wardrobe)])].filter(wearable);
   const colorOf = (item) => colors[item] ?? content.clothes[item].color;
-  const wearers = (item) => dollsSave.dolls.filter((d) => Object.values(d.worn).includes(item) && !Object.values(BODIES[d.body].starter).includes(item)).length;
-  const sellable = (item) => (game.state.wardrobe[item] ?? 0) > wearers(item);   // 衣櫃裡比穿著它的娃娃多的才能賣（基本款每個娃娃都有，不算）
-  // 照格子由內到外分組，每格一行標題；點了試穿，已經穿著的再點一次是脫掉那一格；穿著的那件下面換底色、花紋，選了花紋再多一排花紋色；按存檔才寫進娃娃
+  // 照格子由內到外分組；點了就穿上，已經穿著的再點一次是脫掉那一格；穿著的那件下面換底色、花紋，選了花紋再多一排花紋色
   $("wardrobe").replaceChildren(...Object.keys(SLOT_LABEL).flatMap((slot) => {
     const inSlot = items.filter((item) => CATEGORY_SLOT[content.clothes[item].category] === slot);
     if (!inSlot.length) return [];
     const title = Object.assign(document.createElement("div"), { className: "wardrobe-slot", textContent: SLOT_LABEL[slot] });
-    const chips = inSlot.map((item) => {
+    const cards = inSlot.map((item) => {
       const on = worn[slot] === item;
-      const chip = Object.assign(document.createElement("button"), { className: "item" + (on ? " on" : "") });
-      chip.append(dyeSwatch(colorOf(item), paintSwatch), content.clothes[item].label);
-      chip.onclick = () => editCloset(doll, (current) => { const { [slot]: _, ...rest } = current.worn; return { worn: on ? rest : { ...current.worn, [slot]: item } }; });
-      if (sellable(item)) chip.append(Object.assign(document.createElement("span"), {
-        className: "sell", role: "button", textContent: `賣 $${Math.floor(content.clothes[item].price / 2)}`,
-        onclick: (e) => { e.stopPropagation(); apply({ kind: "sell_clothes", item }); },
-      }));
-      return chip;
+      const card = itemCard(thumbs.clothes(item, doll, colorOf(item)), content.clothes[item].label);
+      card.classList.toggle("on", on);
+      card.onclick = () => editCloset(doll, (current) => { const { [slot]: _, ...rest } = current.worn; return { worn: on ? rest : { ...current.worn, [slot]: item } }; });
+      return card;
     });
     const wearing = worn[slot];
     const spec = content.clothes[wearing];
     const recolorable = spec && (spec.dye || !spec.sprites?.[BODIES[doll.body].sprites]);   // 彩色原稿（牛仔短褲）不給換色；灰稿與用模板畫的才行
-    if (!inSlot.includes(wearing) || !recolorable) return [title, ...chips];
+    if (!inSlot.includes(wearing) || !recolorable) return [title, ...cards];
     const dye = colorOf(wearing);
     const setDye = (next) => editCloset(doll, (current) => ({ colors: { ...current.colors, [wearing]: next } }));
     const pattern = dyePattern(dye);
-    return [title, ...chips,
+    return [title, ...cards,
       colorButtons(CLOTHES_COLORS, dyeBase(dye), (color) => setDye(withBase(dye, color, CLOTHES_COLORS))),
       patternRow(PATTERNS, pattern, (p) => dyeSwatch(withPattern(dye, p, CLOTHES_COLORS), paintSwatch), (p) => setDye(withPattern(dye, p, CLOTHES_COLORS))),
-      ...(pattern ? [Object.assign(document.createElement("div"), { className: "wardrobe-sub", textContent: "花紋色" }), colorButtons(CLOTHES_COLORS, dye.patternColor, (color) => setDye(withPatternColor(dye, color)))] : [])];
+      ...(pattern ? [patternColorTitle(dye), colorButtons(CLOTHES_COLORS, dye.patternColor, (color) => setDye(withPatternColor(dye, color)))] : [])];
   }));
+}
+
+/** 「花紋色」那排的小標：一小塊現在的花紋，看得出這排改的是花紋的顏色。 */
+function patternColorTitle(dye) {
+  const title = Object.assign(document.createElement("div"), { className: "wardrobe-sub" });
+  const sample = dyeSwatch(dye, paintSwatch);
+  sample.classList.add("pattern-sample");
+  title.append(sample, "花紋色");
+  return title;
+}
+
+/** 一張商品／衣服卡：上面大縮圖，下面小字；extra 是價錢、數量這類放在卡片裡的東西。 */
+function itemCard(image, label, ...extra) {
+  const card = Object.assign(document.createElement("button"), { className: "card", type: "button" });
+  card.setAttribute("aria-label", label);
+  const picture = typeof image === "string" ? thumbImage(image) : image;
+  card.append(picture, Object.assign(document.createElement("span"), { className: "card-label", textContent: label }), ...extra);
+  return card;
 }
 
 /** 衣櫃的一排色票：current 那顆亮著，點了呼叫 onPick(color)。 */
@@ -391,8 +468,7 @@ function drawCloset(time) {
   const body = BODIES[doll.body];
   const skeleton = skeletons[body.views.front];
   const who = { name: body.sprites, skeletons: { front: skeleton, front34: skeletons[body.views.front34], back34: skeletons[body.views.back34] }, headParts: headParts(doll) };
-  const look = closetLook(doll);   // 試穿中就畫草稿
-  const { outfits, bodyTint } = dressUp(who, look.worn, content.clothes, look.colors);
+  const { outfits, bodyTint } = dressUp(who, doll.worn, content.clothes, doll.colors);
   const scale = (rect.height * 0.92) / skeleton.data.canvas.h;
   skeleton.draw(ctx, samplePose(animations.idle, time, "front"), { x: rect.width / 2 - (skeleton.data.canvas.w * scale) / 2, y: rect.height * 0.04, scale, outfits, skin: doll.skin, bodyTint });
 }
@@ -405,6 +481,7 @@ function drawCloset(time) {
 
 const creator = setupCreator({
   skeletons, animations, samplePose, clothes: content.clothes, dressUp,
+  takenNames: (exceptId) => dollsSave.dolls.filter((d) => d.id !== exceptId).map((d) => d.name),
   onSave: (doll, isNew) => {
     try {
       const placed = isNew ? { ...doll, spot: house.freeSpotNear(doll.spot) } : doll;   // 新娃娃出生時避開已經有人站的格子
@@ -416,24 +493,34 @@ const creator = setupCreator({
   },
 });
 
+/** 娃娃分頁：每個娃娃一張全身卡（點卡片就選她），下面是修改、刪掉；還有空位就多一張加號卡。 */
 function renderDolls() {
   const { dolls, selected } = dollsSave;
-  $("dollsInfo").textContent = `娃娃 ${dolls.length}／4`;
-  $("addDoll").disabled = dolls.length >= 4;
-  $("dollList").replaceChildren(...dolls.map((doll) => {
+  $("dollsInfo").textContent = "";
+  const cards = dolls.map((doll) => {
     const card = Object.assign(document.createElement("div"), { className: "doll-card" + (doll.id === selected ? " on" : "") });
+    const pick = Object.assign(document.createElement("button"), { className: "doll-pick", type: "button", onclick: () => setDolls({ ...dollsSave, selected: doll.id }) });
+    pick.setAttribute("aria-label", `選${doll.name}`);
+    pick.append(thumbImage(thumbs.full(doll), "full"), Object.assign(document.createElement("strong"), { textContent: doll.name }));
     const actions = Object.assign(document.createElement("div"), { className: "row" });
-    const small = (label, onclick, disabled = false) => Object.assign(document.createElement("button"), { textContent: label, onclick, disabled });
-    actions.append(
-      small(doll.id === selected ? "操作中" : "選她", () => setDolls({ ...dollsSave, selected: doll.id }), doll.id === selected),
-      small("修改", () => creator.open(doll)),
-      small("刪掉", () => { try { setDolls({ dolls: removeDoll(dolls, doll.id), selected: selected === doll.id ? dolls.find((d) => d.id !== doll.id).id : selected }); } catch (error) { flash(error.message); } }, dolls.length <= 1),
-    );
-    card.append(Object.assign(document.createElement("strong"), { textContent: doll.name }), actions);
+    actions.append(iconButton("pencil", `修改${doll.name}`, () => creator.open(doll), "big"));
+    if (dolls.length > 1) {
+      const remove = iconButton("bin", `刪掉${doll.name}`, null, "big");   // 平常灰色，點一下變紅、冒出紅色垃圾桶，再點才刪
+      actions.append(confirmable(remove, `delete:${doll.id}`, "delete", () => {
+        try { setDolls({ dolls: removeDoll(dolls, doll.id), selected: selected === doll.id ? dolls.find((d) => d.id !== doll.id).id : selected }); } catch (error) { flash(error.message); }
+      }));
+    }
+    card.append(pick, actions);
     return card;
-  }));
+  });
+  if (dolls.length < MAX_DOLLS) {
+    const add = Object.assign(document.createElement("button"), { className: "doll-card doll-add", type: "button", onclick: () => creator.open(null) });
+    add.setAttribute("aria-label", "新增娃娃");
+    add.append(icon("plus"), icon("dolls"));
+    cards.push(add);
+  }
+  $("dollList").replaceChildren(...cards);
 }
-$("addDoll").onclick = () => creator.open(null);
 
 function restoreSave(saved) {
   game.replace(saved.game);
@@ -469,8 +556,9 @@ $("cloudLoad").onclick = async () => {
 
 function renderStatus() {
   const doll = dollsSave.dolls.find((d) => d.id === dollsSave.selected) ?? dollsSave.dolls[0];
-  $("money").textContent = `$${game.state.money}`;
-  $("currentDoll").textContent = doll ? `正在操作：${doll.name}` : "";
+  $("money").replaceChildren(price(game.state.money));
+  $("currentDoll").replaceChildren(...(doll ? [thumbImage(thumbs.face(doll), "face"), doll.name] : []));
+  $("currentDoll").title = doll ? `正在操作：${doll.name}` : "";
   $("currentDoll").onclick = () => showTab("dolls");
 }
 
@@ -488,6 +576,7 @@ function renderAll() {
 }
 
 game.subscribe(() => renderAll());
+onConfirmChange(() => renderAll());
 renderAll();
 if (!dollsSave.dolls.length) { showTab("dolls"); creator.open(null, { first: true }); }
 $("loading").classList.add("done");

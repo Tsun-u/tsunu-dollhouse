@@ -40,8 +40,8 @@
     <div id="roomTabs" class="chips"></div>
     <div id="toolbar">
       <span id="pieceActions"></span>
-      <button id="flipBtn" disabled>轉向</button>
-      <button id="storeBtn" disabled>收回倉庫</button>
+      <button id="flipBtn" class="icon-btn" disabled aria-label="轉向" title="轉向"></button>
+      <button id="storeBtn" class="icon-btn" disabled aria-label="收回倉庫" title="收回倉庫"></button>
     </div>
     <div id="piecePalette" class="palette" hidden></div>
     <div id="tvChannels" class="channels" hidden></div>
@@ -61,24 +61,19 @@
       <div id="tablePut" class="chips"></div>
       <form id="noteForm"><input id="noteInput" type="text" maxlength="200" placeholder="留一張紙條…" autocomplete="off"><button type="submit">放</button></form>
     </div>
-    <div class="panel-head"><span>倉庫（點一下家具，再點房間的地板放下去）</span></div>
-    <div id="inventory" class="chips"></div>
+    <h2 class="section" data-icon="box">倉庫</h2>
+    <div id="inventory" class="cards"></div>
     <details id="journalBox"><summary>最近發生的事</summary><div id="journal"></div></details>
   </section>
 
   <section id="closet" class="tab">
-    <div class="panel-head"><span>幫誰換衣服</span><span id="closetWho" class="chips"></span></div>
+    <div id="closetWho" class="who-row" aria-label="幫誰換衣服"></div>
     <div id="closetBody">
-      <canvas id="closetCanvas"></canvas>
+      <div class="closet-stage"><canvas id="closetCanvas"></canvas><span id="closetUndo"></span></div>
       <div class="closet-list">
-        <div id="closetSave" class="closet-save" hidden><span>試穿中，存檔才會換上</span><button id="closetSaveBtn">存檔</button><button id="closetDiscardBtn" class="quiet">放棄</button></div>
-        <div id="wardrobe" class="chips"></div>
+        <div id="wardrobe" class="cards"></div>
       </div>
     </div>
-    <dialog id="closetLeave" class="closet-leave">
-      <p>這套還沒存檔，要換上嗎？</p>
-      <div class="chips"><button data-choice="save">存檔</button><button data-choice="discard" class="quiet">放棄這套</button><button data-choice="stay" class="quiet">繼續試穿</button></div>
-    </dialog>
   </section>
 
   <section id="puzzle" class="tab">
@@ -99,43 +94,46 @@
     <div id="rentPanel" class="rent" hidden>
       <span id="rentTitle"></span>
       <span id="rentChoices"></span>
-      <button id="rentCancel" class="quiet">先不要</button>
+      <span id="rentCancel"></span>
     </div>
     <div class="panel-head"><span id="cafeInfo"></span><button id="cafeToggle"></button></div>
     <canvas id="cafeCanvas"></canvas>
     <div id="decorPanel" class="rent" hidden>
       <span id="decorPanelTitle"></span>
       <span id="decorChoices"></span>
-      <button id="decorClose" class="quiet">關閉</button>
+      <span id="decorClose"></span>
     </div>
     <div class="panel-head"><span id="cafeProductsHint">櫃台上的商品（點客人就出餐）</span></div>
     <div id="cafeProducts" class="chips"></div>
   </section>
 
   <section id="shop" class="tab">
-    <div class="panel-head"><span id="shopMoney"></span></div>
-    <div id="shopList" class="chips"></div>
-    <div class="panel-head"><span>蓋房間</span></div>
-    <div id="buildList" class="chips"></div>
-    <div class="panel-head"><span id="decorTitle"></span></div>
-    <div class="decor-row"><span class="decor-label">地板</span><div id="floorList" class="chips"></div></div>
-    <div class="decor-row"><span class="decor-label">壁紙</span><div id="wallList" class="chips"></div></div>
-    <div class="panel-head"><span>衣服（買到的進衣櫃）</span></div>
-    <div id="clothesShop" class="chips"></div>
-    <div class="panel-head"><span>倉庫裡的家具（點一下賣回，半價）</span></div>
-    <div id="resaleList" class="chips"></div>
+    <div class="panel-head"><span id="shopMoney" class="money-line"></span></div>
+    <h2 class="section" data-icon="sofa">家具</h2>
+    <div id="shopList" class="cards"></div>
+    <h2 class="section" data-icon="closet">衣服</h2>
+    <div id="clothesShop" class="cards"></div>
+    <h2 class="section" data-icon="build">蓋房間</h2>
+    <div id="buildList" class="cards"></div>
+    <h2 class="section" data-icon="floor"><span id="decorTitle"></span></h2>
+    <div id="floorList" class="cards"></div>
+    <h2 class="section" data-icon="wall">壁紙</h2>
+    <div id="wallList" class="cards"></div>
+    <h2 class="section" data-icon="sell">賣東西</h2>
+    <div id="resaleList" class="cards"></div>
   </section>
 
   <section id="dolls" class="tab">
-    <div class="panel-head"><span id="dollsInfo"></span><button id="addDoll">新增娃娃</button></div>
+    <div class="panel-head"><span id="dollsInfo"></span></div>
     <div id="dollList"></div>
     <div id="creatorBox" hidden>
-      <div class="panel-head"><span id="creatorTitle"></span><span><button id="creatorCancel">取消</button> <button id="creatorSave">好了</button></span></div>
+      <div class="panel-head"><span id="creatorTitle"></span><span class="creator-buttons"><span id="creatorCancel"></span><span id="creatorSave"></span></span></div>
       <div id="creator">
         <canvas id="creatorCanvas"></canvas>
         <div id="creatorOptions"></div>
       </div>
     </div>
+    <details id="saveDetails"><summary id="saveSummary">存檔</summary>
     <div id="saveBox">
       <button id="exportSave">匯出存檔</button>
       <label class="item"><input id="importSave" type="file" accept="application/json" hidden>匯入存檔</label>
@@ -143,6 +141,7 @@
       <button id="cloudLoad">從雲端取回</button>
       <span id="saveInfo"></span>
     </div>
+    </details>
   </section>
 </main>
 <script type="module" src="./src/main.js"></script>

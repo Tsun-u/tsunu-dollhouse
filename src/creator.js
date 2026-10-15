@@ -4,11 +4,13 @@
 import { BODIES, FACES, FACE_OFFSET_MAX, GLASSES, HAIRS, MOUTHS, HAIR_COLORS, IRIS_COLORS, LIP_COLORS, SKIN_TONES, available, headParts } from "../vendor/rules/looks.js";
 import { swatchRow } from "../vendor/web/swatches.js";
 import { createDoll } from "./dolls.js";
+import { drawName } from "./names.js";
+import { iconButton } from "./ui.js";
 
 const VIEW_LABELS = { front: "正面", front34: "斜前", back34: "斜後" };
 const $ = (id) => document.getElementById(id);
 
-export function setupCreator({ skeletons, animations, samplePose, clothes, dressUp, onSave, onCancel }) {
+export function setupCreator({ skeletons, animations, samplePose, clothes, dressUp, onSave, onCancel, takenNames = () => [] }) {
   let draft = null, isNew = false, view = "front34";
 
   const skeletonOf = (body, v) => skeletons[BODIES[body].views[v]];
@@ -51,8 +53,9 @@ export function setupCreator({ skeletons, animations, samplePose, clothes, dress
     const highlightable = Boolean(hairOption?.highlight && outfitsOf(draft.body)[hairOption.highlight]);   // 這款髮型有畫挑染位置
     const name = Object.assign(document.createElement("input"), { id: "dollName", value: draft.name, maxLength: 12, placeholder: "取個名字" });
     name.oninput = () => { draft.name = name.value; };
+    const reroll = iconButton("dice", "換一個名字", () => { draft.name = drawName(takenNames(draft.id), draft.name.trim() || null); name.value = draft.name; });
     $("creatorOptions").replaceChildren(
-      group("名字", name),
+      group("名字", row("name-row", [name, reroll])),
       group("看哪一面", row("chips", Object.entries(VIEW_LABELS).map(([id, label]) => chip(label, view === id, () => { view = id; render(); })))),
       group("身體", row("chips", Object.entries(BODIES).map(([id, body]) => chip(body.label, draft.body === id, () => set(fitToBody({ ...draft, body: id })))))),
       group("膚色", swatchRow(SKIN_TONES, draft.skin, (skin) => set({ skin }))),
@@ -91,18 +94,17 @@ export function setupCreator({ skeletons, animations, samplePose, clothes, dress
     requestAnimationFrame(loop);
   })(performance.now());
 
-  $("creatorSave").onclick = () => {
-    if (!draft.name.trim()) { $("dollName")?.focus(); return; }
-    onSave({ ...draft, name: draft.name.trim() }, isNew);
+  $("creatorSave").replaceChildren(iconButton("check", "好了", () => {
+    onSave({ ...draft, name: draft.name.trim() || drawName(takenNames(draft.id)) }, isNew);   // 沒取名字就從辭典抽一個
     $("creatorBox").hidden = true;
-  };
-  $("creatorCancel").onclick = () => { $("creatorBox").hidden = true; onCancel?.(); };
+  }, "big"));
+  $("creatorCancel").replaceChildren(iconButton("cross", "取消", () => { $("creatorBox").hidden = true; onCancel?.(); }, "big"));
 
   return {
     /** doll 為 null 是新增；first 為 true 是第一個娃娃（不能取消）。 */
     open(doll, { first = false } = {}) {
       isNew = !doll;
-      draft = doll ? { ...doll } : fitToBody(createDoll({ name: "", body: "f" }));
+      draft = doll ? { ...doll } : fitToBody(createDoll({ name: drawName(takenNames(null)), body: "f" }));
       $("creatorTitle").textContent = first ? "先捏一個娃娃住進家裡" : isNew ? "新增娃娃" : `修改${doll.name}`;
       $("creatorCancel").hidden = first;
       $("creatorBox").hidden = false;

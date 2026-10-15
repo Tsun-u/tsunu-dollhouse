@@ -7,6 +7,7 @@ import { createGestures } from "../vendor/web/gestures.js";
 import { Pets } from "../vendor/web/pets.js";
 import { RoomView } from "../vendor/web/room-view.js";
 import { swatchRow } from "../vendor/web/swatches.js";
+import { trimmedImage } from "./thumbs.js";
 
 const $ = (id) => document.getElementById(id);
 const WAVE_MS = 3200;
@@ -18,6 +19,13 @@ function channelChips(tv, piece, onPick) {
     const playing = piece.on && piece.program === program;
     return button(program, playing ? null : () => onPick(program), playing ? "item on" : "item");
   });
+}
+
+/** 沒有圖的家具：用代表色畫一塊。 */
+function swatchBlock(color) {
+  const block = Object.assign(document.createElement("span"), { className: "thumb surface" });
+  block.style.background = color;
+  return block;
 }
 
 export class House {
@@ -245,13 +253,18 @@ export class House {
     const catalog = this.deps.content.furniture;
     $("inventory").replaceChildren(...Object.entries(this.deps.game.state.inventory).map(([item, count]) => {
       const spec = catalog[item];
-      const chip = document.createElement("button");
-      chip.className = "item" + (this.pendingItem === item ? " on" : "");
-      chip.innerHTML = `<span class="swatch" style="background:${spec.color}"></span>${spec.label}<span class="count">×${count}</span>`;
-      chip.onclick = () => { this.pendingItem = this.pendingItem === item ? null : item; this.selectPiece(null); this.renderInventory(); };
-      return chip;
+      const card = document.createElement("button");
+      card.className = "card" + (this.pendingItem === item ? " on" : "");
+      card.setAttribute("aria-label", spec.label);
+      card.append(
+        spec.image ? Object.assign(document.createElement("img"), { src: trimmedImage(spec.image, () => this.renderInventory()), className: "thumb", alt: "", draggable: false }) : swatchBlock(spec.color),
+        Object.assign(document.createElement("span"), { className: "card-label", textContent: spec.label }),
+        Object.assign(document.createElement("span"), { className: "count-badge", textContent: `×${count}` }),
+      );
+      card.onclick = () => { this.pendingItem = this.pendingItem === item ? null : item; this.selectPiece(null); this.renderInventory(); };
+      return card;
     }));
-    if (!$("inventory").children.length) $("inventory").textContent = "倉庫空了，去家具店看看。";
+    $("inventory").previousElementSibling.hidden = $("inventory").hidden = !$("inventory").children.length;   // 倉庫空了就整段收起來
   }
 
   selectPiece(id) {

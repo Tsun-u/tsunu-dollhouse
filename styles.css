@@ -59,14 +59,21 @@ body {
 }
 
 #tabs { display: flex; gap: 6px; }
-#tabs button { background: var(--panel); color: var(--ink); border: 1px solid var(--line); white-space: nowrap; }
-@media (max-width: 560px) {   /* 手機：分頁鈕平分整排、縮內距，六個字數不同的分頁都擠得下一行 */
-  #tabs { width: 100%; }
-  #tabs button { flex: 1 1 0; padding: 8px 2px; }
+#tabs button { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 58px; padding: 6px 6px 4px; background: var(--panel); color: var(--ink); border: 2px solid var(--line); white-space: nowrap; }
+#tabs .ico { width: 34px; height: 34px; }
+#tabs .tab-label { font-size: 11px; color: var(--muted); }
+@media (max-width: 560px) {   /* 手機：分頁鈕平分整排，七顆圖示擠得下一行 */
+  #tabs { width: 100%; gap: 4px; }
+  #tabs button { flex: 1 1 0; min-width: 0; padding: 5px 0 3px; }
+  #tabs .ico { width: 30px; height: 30px; }
+  #tabs .tab-label { font-size: 10px; }
 }
-#tabs button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+#tabs button.on { background: #fde9da; border-color: var(--accent); }
+#tabs button.on .tab-label { color: var(--ink); font-weight: 600; }
 
 #status { font-size: 14px; color: var(--muted); }
+#money .price { font-size: 18px; font-weight: 700; color: var(--ink); }
+#money .price .ico { width: 24px; height: 24px; }
 
 .tab { display: none; }
 .tab.on { display: block; }
@@ -129,20 +136,15 @@ button:disabled { background: var(--line); color: var(--muted); cursor: default;
 }
 .rent[hidden] { display: none; }
 .rent #rentChoices, .rent #decorChoices { display: flex; flex-wrap: wrap; gap: 8px; }
-#decorChoices button.chosen { outline: 2px solid #c98a4a; font-weight: bold; }
-.rent button.quiet, #cafeProducts button.quiet { background: var(--line); color: var(--ink); }
-
-/* 家具店的裝潢這間房：地板、壁紙兩排 */
-.decor-row { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; }
-.decor-label { flex: none; font-size: 13px; color: var(--muted); width: 2.5em; }
+#rentTitle, #decorPanelTitle { display: inline-flex; align-items: center; gap: 6px; }
+#rentTitle .ico, #decorPanelTitle .ico { width: 26px; height: 26px; }
+#cafeProducts .icon-btn { padding: 2px; }
 
 /* 家具換布面的色盤 */
 .palette { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; margin: 8px 0; font-size: 13px; color: var(--muted); }
 .palette[hidden] { display: none; }
 .palette button.reset { font-size: 12px; background: var(--line); color: var(--ink); }
 
-/* 衣櫃裡賣得掉的衣服 */
-.item .sell { margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: var(--line); color: var(--ink); font-size: 12px; cursor: pointer; }
 
 #puzzleShop { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; font-size: 14px; }
 
@@ -258,13 +260,16 @@ button:disabled { background: var(--line); color: var(--muted); cursor: default;
 #status { display: flex; align-items: center; gap: 8px; }
 #currentDoll:empty { display: none; }
 #currentDoll { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
-.doll-face { width: 28px; height: 28px; border-radius: 50%; background: #efe6d4; }
+#currentDoll img.face { width: 30px; height: 30px; border-radius: 50%; background: #fff; }
+#currentDoll { cursor: pointer; padding: 2px 10px 2px 2px; }
 #dollList { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
 .doll-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .doll-card.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
-.doll-card canvas { width: 100%; aspect-ratio: 2 / 3; }
-.doll-card .row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-.doll-card .row button { white-space: nowrap; padding: 6px 12px; }
+.doll-pick { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; padding: 0; background: none; color: var(--ink); font-size: 15px; }
+.doll-pick img.full { width: 100%; max-width: 180px; aspect-ratio: 1; object-fit: contain; }
+.doll-card .row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.doll-add { justify-content: center; min-height: 220px; border-style: dashed; cursor: pointer; flex-direction: row; }
+.doll-add .ico { width: 44px; height: 44px; }
 #creator { display: grid; grid-template-columns: minmax(180px, 300px) 1fr; gap: 16px; align-items: start; }
 #creatorCanvas { width: 100%; aspect-ratio: 2 / 3; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
 .option-group { margin-bottom: 10px; }
@@ -289,14 +294,94 @@ button:disabled { background: var(--line); color: var(--muted); cursor: default;
 .swatches.patterns button { overflow: hidden; background: var(--panel); }
 .swatches.patterns button.on { padding: 2px; }
 .swatches.patterns canvas { display: block; width: 100%; height: 100%; border-radius: 50%; }
-/* 衣櫃試穿：草稿跟身上穿的不一樣時出現存檔／放棄 */
-.closet-save { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; padding: 8px 10px; border-radius: 10px; background: var(--panel); border: 1px dashed var(--accent); font-size: 14px; color: var(--muted); }
-.closet-save[hidden] { display: none; }
-.closet-save span { flex: 1 1 auto; }
-.closet-save button.quiet, .closet-leave button.quiet { background: var(--line); color: var(--ink); }
-.closet-leave { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); padding: 16px 18px; }
-.closet-leave::backdrop { background: rgba(59, 47, 42, 0.35); }
-.closet-leave p { margin: 0 0 12px; }
 #dollName { font: inherit; font-size: 16px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; width: 100%; max-width: 240px; }
 #saveBox { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 @media (max-width: 560px) { #creator { grid-template-columns: 1fr; } #creatorCanvas { max-width: 260px; margin: 0 auto; } }
+
+/* ───────── 圖示化介面（不識字也能玩） ───────── */
+.ico { display: inline-block; width: 22px; height: 22px; flex: none; line-height: 0; }
+.ico svg { width: 100%; height: 100%; }
+
+/* 只有圖示的按鈕 */
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; padding: 6px; border-radius: 12px; background: var(--panel); border: 2px solid var(--line); }
+.icon-btn .ico { width: 26px; height: 26px; }
+.icon-btn.big .ico { width: 36px; height: 36px; }
+.icon-btn:disabled { opacity: 0.35; background: var(--panel); }
+#toolbar .icon-btn .ico { width: 30px; height: 30px; }
+
+/* 價錢：金幣＋數字 */
+.price { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.price .ico { width: 18px; height: 18px; }
+.money-line .price { font-size: 20px; }
+.money-line .price .ico { width: 26px; height: 26px; }
+
+/* 區段標題：圖示＋小字 */
+h2.section { display: flex; align-items: center; gap: 8px; margin: 16px 0 4px; font-size: 14px; font-weight: 600; color: var(--muted); }
+h2.section .ico { width: 30px; height: 30px; }
+h2.section[hidden] { display: none; }
+
+/* 卡片：上面大縮圖、下面小字和價錢 */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; padding: 6px 0; }
+.cards[hidden] { display: none; }
+#wardrobe.cards { align-items: start; }
+.card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; border: 2px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--ink); font-size: 12px; cursor: pointer; }
+.card .thumb { width: 64px; height: 64px; object-fit: contain; display: block; }
+.card > .ico:first-child { width: 48px; height: 48px; margin: 8px 0; }
+.card-label { color: var(--muted); font-size: 11px; line-height: 1.2; text-align: center; }
+.card.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); background: #fff4ea; }
+.card:disabled { background: var(--panel); color: var(--ink); cursor: default; }
+.card.poor { opacity: 0.4; filter: grayscale(0.85); }   /* 買不起：灰淡、點不了 */
+.card.selling { border-style: dashed; }
+.count-badge { position: absolute; top: 4px; left: 6px; padding: 0 5px; border-radius: 999px; background: #fff; border: 1px solid var(--line); font-size: 11px; font-weight: 700; }
+.using-mark { position: absolute; top: -6px; right: -6px; width: 26px; height: 26px; }
+
+/* 兩步確認：選中時亮框，右上角冒出勾勾（買、賣）或垃圾桶（刪） */
+.confirmable.armed { transform: scale(1.06); z-index: 1; }
+.confirm-go.armed { border-color: #4caf6e; box-shadow: 0 0 0 3px #4caf6e; }
+.confirm-delete.armed { border-color: #e05a4f; box-shadow: 0 0 0 3px #e05a4f; }
+.confirm-badge { position: absolute; top: -12px; right: -12px; width: 38px; height: 38px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25)); animation: badge-pop 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.icon-btn.confirmable { position: relative; }
+@keyframes badge-pop { from { transform: scale(0.3); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .confirm-badge { animation: none; } .confirmable.armed { transform: none; } }
+
+/* 地板、壁紙小樣，蓋房間的格子圖 */
+.thumb.surface { display: block; width: 64px; height: 64px; border-radius: 10px; border: 1px solid var(--line); }
+.thumb.room-sample { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 64px; height: 64px; }
+.room-sample .ico { width: 30px; height: 30px; }
+.room-grid { display: grid; width: 44px; gap: 1px; background: #cdb593; border: 1px solid #cdb593; }
+.room-grid i { background: #f6e7cc; }
+
+/* 選娃娃：頭像＋名字 */
+.who-row { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; }
+.who { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 6px; border: 2px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--muted); font-size: 11px; }
+.who img.face { width: 52px; height: 52px; border-radius: 50%; background: #fff; }
+.who.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); color: var(--ink); font-weight: 600; }
+
+/* 衣櫃預覽右上角的復原鈕；衣櫃清單的小標、色票、花紋各自佔一整行 */
+.closet-stage { position: relative; }
+#closetUndo { position: absolute; top: 8px; right: 8px; }
+.wardrobe-slot, .wardrobe-sub, .wardrobe-colors, .swatches.patterns { grid-column: 1 / -1; }
+.wardrobe-sub { display: flex; align-items: center; gap: 6px; }
+.pattern-sample { width: 22px; height: 22px; border-radius: 50%; overflow: hidden; display: inline-block; }
+.pattern-sample canvas { width: 100%; height: 100%; display: block; }
+
+/* 捏人：名字旁的骰子、右上角的叉叉和勾勾 */
+.name-row { display: flex; align-items: center; gap: 8px; }
+.creator-buttons { display: flex; gap: 10px; }
+
+/* 商店街：開門是太陽、打烊是月亮 */
+#cafeToggle.opening { border-color: #f4c542; background: #fff7d6; }
+#cafeToggle.closing { border-color: #8a7fb8; background: #eeeaf8; }
+#rentChoices .card, #decorChoices .card { min-width: 96px; }
+/* 大人用的存檔區收起來 */
+#saveDetails { margin-top: 20px; font-size: 13px; color: var(--muted); }
+#saveDetails summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+#saveDetails summary .ico { width: 22px; height: 22px; }
+#rentChoices .card .thumb { width: 132px; height: 52px; }   /* 招牌圖是橫的 */
+@media (max-width: 560px) {   /* 手機：一排放四張卡 */
+  .cards { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+  .card .thumb { width: 56px; height: 56px; }
+}
+#shopMoney:empty { display: none; }
+@media (max-width: 560px) { .closet-stage { width: 190px; margin: 0 auto; } #closetCanvas { max-width: none; } }   /* 手機：預覽縮小置中，衣服不用捲很遠才看到 */
+@media (max-width: 560px) { #dollList { grid-template-columns: repeat(2, 1fr); gap: 8px; } .doll-add { min-height: 150px; } }   /* 手機：娃娃卡一排兩張 */
