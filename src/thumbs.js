@@ -78,6 +78,15 @@ export function createThumbs({ skeletons, animations, samplePose, clothes, dress
     return cache.get(key);
   }
 
+  /** 娃娃的畫像每個娃娃只留最新一張：外觀（sig）變了就重畫、換掉舊的，換裝換一下午也不會越存越多。 */
+  const portraits = new Map();
+  function portrait(key, sig, make) {
+    const held = portraits.get(key);
+    if (held?.sig !== sig) portraits.set(key, { sig, url: make() });
+    return portraits.get(key).url;
+  }
+  const looksOf = (doll) => JSON.stringify({ ...doll, spot: null, name: null, asleep: null });
+
   return {
     /** 這件衣服穿在 doll 身上的樣子（只穿這件），dye 是現在的顏色；男女素體穿不了的退回另一個素體。 */
     clothes(item, doll, dye) {
@@ -96,20 +105,18 @@ export function createThumbs({ skeletons, animations, samplePose, clothes, dress
       });
     },
 
-    /** 娃娃的臉（頭和頭髮）。 */
+    /** 娃娃的臉（頭和頭髮）：不畫衣服，換裝時不用重畫，只有長相改了才換。 */
     face(doll) {
-      return cached(`f|${JSON.stringify({ ...doll, spot: null, name: null })}`, () => {
-        const who = whoOf(doll, true);
-        const look = dressUp(who, doll.worn, clothes, doll.colors);
-        const head = render(doll, look, { only: new Set(["head"]) });
-        const box = bounds(head);
+      return portrait(`f|${doll.id}`, looksOf({ ...doll, worn: null, colors: null }), () => {
+        const look = dressUp(whoOf(doll, true), {}, clothes);
+        const box = bounds(render(doll, look, { only: new Set(["head"]) }));
         return crop(render(doll, look), box);
       });
     },
 
     /** 娃娃的全身。 */
     full(doll) {
-      return cached(`b|${JSON.stringify({ ...doll, spot: null, name: null })}`, () => {
+      return portrait(`b|${doll.id}`, looksOf(doll), () => {
         const who = whoOf(doll, true);
         const canvas = render(doll, dressUp(who, doll.worn, clothes, doll.colors));
         return crop(canvas, bounds(canvas), 240);
@@ -120,9 +127,15 @@ export function createThumbs({ skeletons, animations, samplePose, clothes, dress
 
 /** 家具等大畫布的圖：載好後裁掉四周透明的部分，縮圖才不會只剩中間一小塊。裁好前先回傳原圖，裁好呼叫 onReady 讓畫面重畫。 */
 const trimmed = new Map();
+const waiting = new Map();   // 還在裁的圖 → 裁好要通知的人
 export function trimmedImage(src, onReady) {
-  if (trimmed.has(src)) return trimmed.get(src) ?? src;
+  if (trimmed.has(src)) {
+    if (trimmed.get(src)) return trimmed.get(src);
+    waiting.get(src).add(onReady);
+    return src;
+  }
   trimmed.set(src, null);
+  waiting.set(src, new Set([onReady]));
   const image = new Image();
   image.onload = () => {
     const canvas = Object.assign(document.createElement("canvas"), { width: image.naturalWidth, height: image.naturalHeight });
@@ -138,7 +151,8 @@ export function trimmedImage(src, onReady) {
     const out = Object.assign(document.createElement("canvas"), { width: 128, height: 128 });
     out.getContext("2d").drawImage(canvas, (x0 + x1) / 2 - side / 2, (y0 + y1) / 2 - side / 2, side, side, 0, 0, 128, 128);
     trimmed.set(src, out.toDataURL());
-    onReady();
+    for (const callback of waiting.get(src)) callback();
+    waiting.delete(src);
   };
   image.src = src;
   return src;

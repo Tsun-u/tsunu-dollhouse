@@ -172,6 +172,7 @@ for (const tabButton of $("tabs").children) {
     for (const tab of document.querySelectorAll(".tab")) tab.classList.toggle("on", tab.id === tabButton.dataset.tab);
     if (tabButton.dataset.tab === "cafe") pickShopkeeper();
     if (tabButton.dataset.tab === "closet") { closetOrigin = null; renderCloset(); }
+    else if (othersStale) renderAll();
     fitScenes();
     if (tabButton.dataset.tab === "home") house.room.draw();
   };
@@ -359,18 +360,28 @@ let closetOrigin = null;
 /** 兩份「格子 → 衣服」或「衣服 → 染法」一樣；same 比兩個值（染法用 sameDye 比內容）。 */
 const sameEntries = (a, b, same = (x, y) => x === y) => [...new Set([...Object.keys(a), ...Object.keys(b)])].every((key) => same(a[key], b[key]));
 
+/** 換裝只重畫衣櫃和狀態列（平板上整頁重建一次要好幾百毫秒），其他畫面等切分頁時再補。 */
+let othersStale = false;
+function dressDoll(id, changes) {
+  dollsSave = { ...dollsSave, dolls: updateDoll(dollsSave.dolls, id, changes) };
+  saveDolls(storage, dollsSave);
+  othersStale = true;
+  renderCloset();
+  renderStatus();
+}
+
 /** 點了就穿上：直接寫進娃娃，第一次改之前先記下原本那套。 */
 function editCloset(doll, change) {
   const current = { worn: { ...doll.worn }, colors: { ...(doll.colors ?? {}) } };
   if (closetOrigin?.id !== doll.id) closetOrigin = { id: doll.id, ...current };
-  setDolls({ ...dollsSave, dolls: updateDoll(dollsSave.dolls, doll.id, change(current)) });
+  dressDoll(doll.id, change(current));
 }
 
 function undoCloset() {
   if (!closetOrigin) return;
   const { id, worn, colors } = closetOrigin;
   closetOrigin = null;
-  setDolls({ ...dollsSave, dolls: updateDoll(dollsSave.dolls, id, { worn, colors }) });
+  dressDoll(id, { worn, colors });
 }
 
 /** 這個娃娃跟進衣櫃時穿的不一樣：↩ 才有東西可以復原。 */
@@ -563,6 +574,7 @@ function renderStatus() {
 }
 
 function renderAll() {
+  othersStale = false;
   house.render();
   puzzle.setState(game.state);
   workshop.setState(game.state);
