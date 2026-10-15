@@ -257,7 +257,7 @@ export class House {
       card.className = "card" + (this.pendingItem === item ? " on" : "");
       card.setAttribute("aria-label", spec.label);
       card.append(
-        spec.image ? Object.assign(document.createElement("img"), { src: trimmedImage(spec.image, () => this.renderInventory()), className: "thumb", alt: "", draggable: false }) : swatchBlock(spec.color),
+        spec.image ? trimmedImage(spec.image, () => this.renderInventory()) : swatchBlock(spec.color),
         Object.assign(document.createElement("span"), { className: "card-label", textContent: spec.label }),
         Object.assign(document.createElement("span"), { className: "count-badge", textContent: `×${count}` }),
       );

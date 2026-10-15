@@ -385,3 +385,5 @@ h2.section[hidden] { display: none; }
 #shopMoney:empty { display: none; }
 @media (max-width: 560px) { .closet-stage { width: 190px; margin: 0 auto; } #closetCanvas { max-width: none; } }   /* 手機：預覽縮小置中，衣服不用捲很遠才看到 */
 @media (max-width: 560px) { #dollList { grid-template-columns: repeat(2, 1fr); gap: 8px; } .doll-add { min-height: 150px; } }   /* 手機：娃娃卡一排兩張 */
+.card .thumb.pending { display: block; border-radius: 10px; background: #f3e6d0; }   /* 縮圖還在畫 */
+.thumb.trimmed { display: block; background-repeat: no-repeat; background-position: center; }   /* 家具圖：只露出有東西的那塊 */

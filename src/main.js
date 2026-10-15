@@ -42,7 +42,7 @@ const animations = await (await fetch(`vendor/player/animations.json${bust}`)).j
 const skeletonNames = [...new Set(Object.values(BODIES).flatMap((body) => Object.values(body.views)))];
 const skeletons = Object.fromEntries(await Promise.all(skeletonNames.map(async (name) => [name, await loadSkeleton(`vendor/player/skeleton_${name}.json${bust}`, "vendor/player/assets/", bust)])));
 
-const thumbs = createThumbs({ skeletons, animations, samplePose, clothes: content.clothes, dressUp });
+const thumbs = createThumbs({ skeletons, animations, samplePose, clothes: content.clothes, dressUp, onReady: () => renderSoon() });
 const storage = browserStorage();
 const game = createGame(content, storage);
 let dollsSave = loadDolls(storage, content.clothes);
@@ -171,8 +171,8 @@ for (const tabButton of $("tabs").children) {
     for (const b of $("tabs").children) b.classList.toggle("on", b === tabButton);
     for (const tab of document.querySelectorAll(".tab")) tab.classList.toggle("on", tab.id === tabButton.dataset.tab);
     if (tabButton.dataset.tab === "cafe") pickShopkeeper();
-    if (tabButton.dataset.tab === "closet") { closetOrigin = null; renderCloset(); }
-    else if (othersStale) renderAll();
+    if (tabButton.dataset.tab === "closet") closetOrigin = null;
+    renderAll();   // 家具店、衣櫃、娃娃只在看得到時才畫，切過去時補畫
     fitScenes();
     if (tabButton.dataset.tab === "home") house.room.draw();
   };
@@ -360,12 +360,10 @@ let closetOrigin = null;
 /** 兩份「格子 → 衣服」或「衣服 → 染法」一樣；same 比兩個值（染法用 sameDye 比內容）。 */
 const sameEntries = (a, b, same = (x, y) => x === y) => [...new Set([...Object.keys(a), ...Object.keys(b)])].every((key) => same(a[key], b[key]));
 
-/** 換裝只重畫衣櫃和狀態列（平板上整頁重建一次要好幾百毫秒），其他畫面等切分頁時再補。 */
-let othersStale = false;
+/** 換裝只重畫衣櫃和狀態列（平板上整頁重建一次要好幾百毫秒），其他分頁切過去時會重畫。 */
 function dressDoll(id, changes) {
   dollsSave = { ...dollsSave, dolls: updateDoll(dollsSave.dolls, id, changes) };
   saveDolls(storage, dollsSave);
-  othersStale = true;
   renderCloset();
   renderStatus();
 }
@@ -449,7 +447,7 @@ function patternColorTitle(dye) {
 function itemCard(image, label, ...extra) {
   const card = Object.assign(document.createElement("button"), { className: "card", type: "button" });
   card.setAttribute("aria-label", label);
-  const picture = typeof image === "string" ? thumbImage(image) : image;
+  const picture = typeof image === "string" ? thumbImage(image) : image ?? Object.assign(document.createElement("span"), { className: "thumb pending" });   // null：縮圖還在畫
   card.append(picture, Object.assign(document.createElement("span"), { className: "card-label", textContent: label }), ...extra);
   return card;
 }
@@ -573,16 +571,17 @@ function renderStatus() {
   $("currentDoll").onclick = () => showTab("dolls");
 }
 
+/** 只畫看得到的分頁：家具店、衣櫃、娃娃有一堆縮圖，藏著的時候不用每次都重建。 */
+const showing = (tab) => $(tab).classList.contains("on");
 function renderAll() {
-  othersStale = false;
   house.render();
   puzzle.setState(game.state);
   workshop.setState(game.state);
   cafe.setState(game.state);
   renderCafe();
-  renderShop();
-  renderCloset();
-  renderDolls();
+  if (showing("shop")) renderShop();
+  if (showing("closet")) renderCloset();
+  if (showing("dolls")) renderDolls();
   renderStatus();
   fitScenes();
 }
