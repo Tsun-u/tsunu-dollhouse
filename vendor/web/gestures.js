@@ -78,7 +78,7 @@ export function createGestures(room, pets) {
   /** 被打中：身體晃一下（抱在一起的不晃，姿勢歸抱抱管），頭上飄出幾片羽毛。 */
   function hit(target) {
     if (!target.pos) return;
-    if (!target.cuddleWith && !target.behind) wobble(target);
+    if (!target.cuddleWith && !target.behind && !target.bedAt) wobble(target);
     const [x, top] = room.headTop(target);
     const y = top + HAND_DROP;
     const feathers = Array.from({ length: FEATHERS }, (_, i) => ({

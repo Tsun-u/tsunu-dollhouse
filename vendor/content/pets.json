@@ -5,6 +5,15 @@
   "images": {
    "stand": "assets/pets/dog_black_stand.png",
    "lie": "assets/pets/dog_black_lie.png"
+  },
+  "costumes": {
+   "pumpkin": {
+    "label": "南瓜裝",
+    "images": {
+     "stand": "assets/pets/dog_black_pumpkin_stand.png",
+     "lie": "assets/pets/dog_black_pumpkin_lie.png"
+    }
+   }
   }
  },
  "yellow": {
@@ -13,6 +22,15 @@
   "images": {
    "stand": "assets/pets/dog_yellow_stand.png",
    "lie": "assets/pets/dog_yellow_lie.png"
+  },
+  "costumes": {
+   "pumpkin": {
+    "label": "南瓜裝",
+    "images": {
+     "stand": "assets/pets/dog_yellow_pumpkin_stand.png",
+     "lie": "assets/pets/dog_yellow_pumpkin_lie.png"
+    }
+   }
   },
   "touches": {
    "belly": {

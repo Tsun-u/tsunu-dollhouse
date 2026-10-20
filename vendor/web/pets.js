@@ -20,8 +20,10 @@ export class Pets {
   constructor(specs, room) {
     this.room = room;
     this.images = {};
+    this.costumes = {};   // 狗 id → 身上的裝扮（存檔的 petCostumes）；畫的時候換成那套的圖
     this.dogs = Object.entries(specs).map(([id, spec], index) => {
       for (const [pose, src] of Object.entries(spec.images)) this.load(`${id}:${pose}`, src);
+      for (const [costume, { images }] of Object.entries(spec.costumes ?? {})) for (const [pose, src] of Object.entries(images)) this.load(`${id}:${costume}:${pose}`, src);
       return { id, spec, pos: { x: 1 + index * 2, y: 1 }, path: [], pose: "stand", flip: index === 1, timer: 2 + index * 3, bedId: null };
     });
   }
@@ -290,7 +292,8 @@ export class Pets {
     const lift = seat ? this.room.catalog[seat.item].height * UNIT_H * SEAT_TOP : 0;
     const [sx, sy0] = this.room.toScreen(dog.pos.x + 0.5, dog.pos.y + 0.5);
     const sy = sy0 - hop - lift;
-    const image = this.images[`${dog.id}:${dog.pose}`];
+    const costume = this.costumes[dog.id];
+    const image = (costume && this.images[`${dog.id}:${costume}:${dog.pose}`]) || this.images[`${dog.id}:${dog.pose}`];   // 裝扮的圖還沒到就先畫素顏
     ctx.save();
     if (image) {
       const bounds = image.bounds ?? (image.bounds = opaqueBounds(image));

@@ -76,6 +76,7 @@ export const PATTERNS = [
     { id: "stripes_v", label: "直條紋" },
     { id: "dots", label: "點點" },
     { id: "houndstooth", label: "千鳥格" },
+    { id: "fishnet", label: "漁網" },
 ];
 export const PATTERN_IDS = PATTERNS.map((pattern) => pattern.id);
 /** 隨機穿搭的客人每件能染的衣服抽一次：四件裡一件穿花紋。 */

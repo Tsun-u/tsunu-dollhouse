@@ -35,9 +35,13 @@ const BACK_HUG_RISE = 2;     // 面向鏡頭從後面抱時，抱人往上挪的
 const BACK_HUG_LEAN = { front34: 8, back34: 10 };   // 從後面抱時抱人彎腰幾度，把頭靠到對方頭邊（依兩人面向）
 const CUDDLE_SIDE_PX = 16;   // 抱抱、親親時兩人腳底同高，左右相距這麼多畫面像素
 const CUDDLE_GAP = 0.25;   // 抱抱、親親時發起的人離對方幾格（走進對方的格子，身體才貼得在一起）
-const SEATED_ANIMS = new Set(["sit", "lounge", "sleep", "sleep_hug", "shower"]);   // 人在家具上（坐著、靠著、躺著）
+const BED_SIDE_HUG = { gap: 0.5, nearLean: 6, farLean: -6, farHead: 6 };   // 床上並肩側抱：兩人沿床寬相距幾格；靠鏡頭的人往對方傾、離鏡頭的人後仰並把頭偏過來
+const BED_BACK_HUG = { backLean: 8, frontLean: -4, frontForward: 0.3, backTowardCamera: 0.1, kissFrontLean: 8 };   // 床上圈抱：後面的人往前彎、前面的人往後靠；前面的人往床尾挪幾格、後面的人往鏡頭偏幾格；圈抱著親親時前面的人改成往前彎
+const BED_SIDE_KISS = { tilt: 12, gapTallNear: 12, gapTallFar: 16 };   // 床上並肩親親：高的低頭、矮的抬頭幾度；兩人臀部同高，左右相距幾 px（高的坐靠鏡頭那側時近一點）
+const SEATED_ANIMS = new Set(["sit", "lounge", "lounge_side_hug", "lounge_back_hug", "lounge_back_held", "lounge_back_hug_kiss", "lounge_back_held_kiss", "lounge_turned", "sleep", "sleep_hug", "shower"]);   // 人在家具上（坐著、靠著、躺著）
 const seated = (who) => SEATED_ANIMS.has(who.anim);
 const lying = (who) => who.anim === "sleep" || who.anim === "sleep_hug";
+const heightOf = (who) => who.skeletons[who.view].data.scale ?? 1;   // 身高看骨架檔的 scale
 const LOWER_LEG = /^(lower_leg|foot)_/;   // 小腿與腳掌的骨頭
 const parseCell = (key) => { const [x, y] = key.split(",").map(Number); return { x, y }; };
 const besideCells = ({ x, y }) => [{ x: x + 1, y }, { x: x - 1, y }, { x, y: y + 1 }, { x, y: y - 1 }];
@@ -54,7 +58,7 @@ const SLEEP_Z_LIFT = 30;       // 躺著時 z 從腳底往上這麼多畫面像�
 const DOOR_H = 84, DOOR_INSET = 0.14;   // 門的畫面高度；門框左右各內縮幾成格寬
 const LABEL = { atone: "阿童", tsunu: "阿宇" };
 const STILL_ANIMS = new Set(["idle", "sit", "lounge", "sleep"]);   // 只有呼吸起伏的動作：畫好的人像可以重用
-const STILL_POSE_TOLERANCE = 2;   // 姿勢差不到 2 度、2 個骨架單位（約 0.15 畫面 px）就不重畫
+export const STILL_POSE_TOLERANCE = 2;   // 姿勢差不到 2 度、2 個骨架單位（約 0.15 畫面 px）就不重畫；衣櫃的試穿預覽也用它
 const CROWD = 4;                  // 房間裡超過這麼多人：走路的腳步也重用人像
 const CROWD_WALK_TOLERANCE = 5;   // 人多時走路姿勢差 5 度以上才重畫（腳步一秒更新十幾次）
 const FRESH_PER_FRAME = 1;        // 一幀最多重畫幾個可重用的人像，其餘先貼舊的（平移到新位置），下一幀再輪
@@ -140,10 +144,14 @@ export class RoomView {
       let last = performance.now();
       const loop = (now) => {
         if (!this.characters.length) { this.animating = false; return; }
-        for (const character of this.characters) this.step(character, (now - last) / 1000);
-        this.pets?.step((now - last) / 1000, this.characters);
+        try {
+          for (const character of this.characters) this.step(character, (now - last) / 1000);
+          this.pets?.step((now - last) / 1000, this.characters);
+          if (this.canvas.offsetParent) this.draw();   // 分頁藏起來時人照樣走，只是不重畫
+        } catch (error) {   // 一幀畫壞不讓整個畫面停住；錯誤交給頁面顯示（手機上看不到主控台）
+          this.reportError?.(error);
+        }
         last = now;
-        if (this.canvas.offsetParent) this.draw();   // 分頁藏起來時人照樣走，只是不重畫
         requestAnimationFrame(loop);
       };
       requestAnimationFrame(loop);
@@ -155,28 +163,130 @@ export class RoomView {
     this.pending = { actor, target, behind, kiss };
   }
 
+  /** 持續的抱抱（小屋）：存檔說抱著就一直抱，直到 releaseCuddle。發起的人還在走過去時先排著，走到定位才擺姿勢。 */
+  holdCuddle(actor, target, { behind }) {
+    const same = (c) => c && c.actor === actor && c.target === target && c.behind === behind;
+    if (same(this.held) || (this.pending?.hold && same(this.pending))) return;
+    this.pending = { actor, target, behind, hold: true };
+  }
+
+  releaseCuddle() {
+    if (this.pending?.hold) this.pending = null;
+    if (!this.held) return;
+    const { actor, target } = this.held;
+    this.held = null;
+    this.unstrike(actor, target);
+  }
+
+  /** 放開：站著抱的兩人回正面站好；坐著的由 step() 照座位擺回。 */
+  unstrike(actor, target) {
+    const backHug = !!actor.behind;
+    for (const who of [actor, target]) {
+      who.cuddleAt = who.cuddleWith = who.behind = who.headTilt = who.lean = who.bedAt = null;
+      if (backHug || who.anim === "hug" || who.anim === "hugged") { who.anim = "idle"; who.view = "front"; who.flip = false; }
+    }
+    if (this.bedPair?.people.includes(actor)) this.bedPair = null;
+  }
+
   startCuddle() {
-    const { actor, target, behind, kiss } = this.pending;
+    const { actor, target, behind, kiss, hold } = this.pending;
     this.pending = null;
-    if (!(seated(actor) && seated(target))) this.strikeCuddlePose(actor, target, behind);
-    if (kiss) this.tiltForKiss(actor, target);   // 並肩坐著就維持坐姿，只冒愛心
+    const pair = (c) => c && [c.actor, c.target].includes(actor) && [c.actor, c.target].includes(target);
+    if (!(kiss && pair(this.held))) this.strike(actor, target, behind);
+    if (hold) this.held = { actor, target, behind };
+    if (kiss) this.kissPose(actor, target);
     const mid = { x: (actor.pos.x + target.pos.x) / 2, y: (actor.pos.y + target.pos.y) / 2 };
     this.hearts = { at: mid, until: performance.now() + (kiss ? 2500 : 3200), kiss };
+    if (hold) return;
     clearTimeout(this.cuddleTimer);
     this.cuddleTimer = setTimeout(() => {
-      const backHug = !!actor.behind;
-      for (const who of [actor, target]) {
-        who.cuddleAt = who.cuddleWith = who.behind = who.headTilt = who.lean = null;
-        if (backHug || who.anim === "hug" || who.anim === "hugged") { who.anim = "idle"; who.view = "front"; who.flip = false; }
-      }
+      if (pair(this.held)) this.strike(this.held.actor, this.held.target, this.held.behind);   // 抱著時親完：回到抱著的姿勢
+      else this.unstrike(actor, target);
     }, kiss ? 2500 : 3200);
+  }
+
+  /** 擺抱的姿勢：站著抱、醒著在床上抱（只有 handlers.bedCuddles 打開時，小屋限定；兒童版刻意不做）；其他並肩坐著（沙發、兒童版的床）或一起睡著時維持原本的姿勢，只冒愛心。 */
+  strike(actor, target, behind) {
+    const seat = this.sharedSeat(actor, target);
+    if (!seat) this.strikeCuddlePose(actor, target, behind);
+    else if (this.handlers.bedCuddles && this.catalog[seat.item]?.seatPose === "lounge" && !lying(actor) && !lying(target)) this.strikeBedPose(actor, target, behind, seat);
+    else actor.headTilt = target.headTilt = actor.lean = target.lean = null;
+  }
+
+  /** 兩人停在同一件可坐的家具上：回傳那件家具，否則 null。看位置不看動畫：剛走到、這一幀還沒輪到坐下的人也算。 */
+  sharedSeat(a, b) {
+    if (a.path?.length || b.path?.length) return null;
+    const seat = this.seatAt(a.pos);
+    return seat && seat.id === this.seatAt(b.pos)?.id ? seat : null;
+  }
+
+  /** 床上抱（數值見 docs/specs/2026-10-15-bed-cuddle.md），不管誰發起都一樣：
+   *  並肩側抱：兩人往床寬中間靠攏；靠鏡頭的人往對方傾，遠側那隻手繞到對方背後；離鏡頭的人後仰、頭偏過來。
+   *  從後面抱：高的坐在床頭、往鏡頭偏一點，矮的往床尾挪一點坐在他兩腿中間；手和頭跟站著從後面抱一樣（他環住她、頭靠在她頭上，她握住他的手）。 */
+  strikeBedPose(actor, target, behind, bed) {
+    const along = this.bedAxis(bed), across = along === "x" ? "y" : "x";
+    const { w, d } = this.footprint(bed);
+    const middle = bed[across] + (along === "x" ? d : w) / 2 - 0.5;
+    const row = actor.pos[along];   // 都坐在靠枕頭那一排（pillowSpot）
+    const at = (forward, towardCamera) => ({ [along]: row + forward, [across]: middle + towardCamera });
+    for (const who of [actor, target]) {   // 跟坐床一樣斜前、朝床尾（剛走到的人這一幀還沒被 step 擺好）
+      who.headTilt = who.lean = null;
+      who.view = "front34"; who.flip = along === "x";
+    }
+    if (behind) {
+      const [back, front] = heightOf(actor) >= heightOf(target) ? [actor, target] : [target, actor];
+      back.bedAt = at(0, BED_BACK_HUG.backTowardCamera); front.bedAt = at(BED_BACK_HUG.frontForward, 0);
+      back.anim = "lounge_back_hug"; front.anim = "lounge_back_held";
+      back.lean = BED_BACK_HUG.backLean; front.lean = BED_BACK_HUG.frontLean;
+      this.bedPair = { bed, people: [actor, target], back, front };
+    } else {
+      const [near, far] = actor.pos[across] > target.pos[across] ? [actor, target] : [target, actor];   // 床寬座標大的離鏡頭近
+      near.bedAt = at(0, BED_SIDE_HUG.gap / 2); far.bedAt = at(0, -BED_SIDE_HUG.gap / 2);
+      near.anim = "lounge_side_hug"; far.anim = "lounge";
+      near.lean = BED_SIDE_HUG.nearLean; far.lean = BED_SIDE_HUG.farLean; far.headTilt = BED_SIDE_HUG.farHead;
+      this.bedPair = { bed, people: [actor, target], near, far };
+    }
+  }
+
+  /** 親親的姿勢：床上圈抱著時，前面的人回頭（頭左右翻轉、抬頭）、往前彎，後面的人頭往前湊；床上並肩坐著時兩人臀部同高、頭面對面；其他情況照 tiltForKiss。親完由 startCuddle 的計時器擺回抱的姿勢。 */
+  kissPose(a, b) {
+    const pair = this.bedPair;
+    if (pair?.back && pair.people.includes(a) && pair.people.includes(b)) {
+      pair.back.anim = "lounge_back_hug_kiss"; pair.front.anim = "lounge_back_held_kiss";
+      pair.front.lean = BED_BACK_HUG.kissFrontLean;
+      return;
+    }
+    if (pair?.near && pair.people.includes(a) && pair.people.includes(b)) return this.bedSideKiss(pair);
+    this.tiltForKiss(a, b);
+  }
+
+  /** 床上並肩親親：跟站著親親一樣讓兩人臀部同一個 y、只左右錯開，頭才對得齊；離鏡頭的人把頭翻過來面向對方，高的低頭、矮的抬頭，高的頭畫在最上面（drawBedEmbrace）。 */
+  bedSideKiss(pair) {
+    const { bed, near, far } = pair;
+    const [nearX] = this.toScreen(near.pos.x + 0.5, near.pos.y + 0.5), [farX] = this.toScreen(far.pos.x + 0.5, far.pos.y + 0.5);
+    const nearSide = nearX < farX ? -1 : 1;   // 靠鏡頭的人在畫面左邊（床沿 x）或右邊（床沿 y）
+    const [midX, midY] = this.drawnSpot(near).map((v, i) => (v + this.drawnSpot(far)[i]) / 2);
+    const tallNear = heightOf(near) >= heightOf(far);
+    const gap = tallNear ? BED_SIDE_KISS.gapTallNear : BED_SIDE_KISS.gapTallFar;
+    const cell = (sx) => { const { x, y } = this.fromScreen(sx, midY); return { x: x - 0.5, y: y - 0.5 }; };
+    near.bedAt = cell(midX + nearSide * gap / 2); far.bedAt = cell(midX - nearSide * gap / 2);
+    near.anim = "lounge"; far.anim = "lounge_turned";
+    near.lean = far.lean = null;
+    near.headTilt = tallNear ? -BED_SIDE_KISS.tilt : BED_SIDE_KISS.tilt;   // 正＝抬頭
+    far.headTilt = tallNear ? -BED_SIDE_KISS.tilt : BED_SIDE_KISS.tilt;    // 頭翻過來，正＝低頭
+    this.bedPair = { bed, people: pair.people, near, far, kiss: true };
+  }
+
+  /** toScreen 的反函數（不取整）：畫面座標換回格子座標。 */
+  fromScreen(sx, sy) {
+    const u = (sx - this.originX) / (TILE_W / 2), v = (sy - this.originY) / (TILE_H / 2);
+    return { x: (u + v) / 2, y: (v - u) / 2 };
   }
 
   /** 親親：比較高的人低頭、比較矮的人抬頭（身高看骨架檔的 scale）；一樣高就不動。 */
   tiltForKiss(a, b) {
-    const height = (who) => who.skeletons[who.view].data.scale ?? 1;
-    if (height(a) === height(b)) return;
-    const [tall, short] = height(a) > height(b) ? [a, b] : [b, a];
+    if (heightOf(a) === heightOf(b)) return;
+    const [tall, short] = heightOf(a) > heightOf(b) ? [a, b] : [b, a];
     tall.headTilt = -KISS_HEAD_TILT; short.headTilt = KISS_HEAD_TILT;   // head 正值＝抬頭
     tall.lean = KISS_LEAN; short.lean = 0;
   }
@@ -241,6 +351,7 @@ export class RoomView {
     if (!next && this.pending && this.pending.actor === character) { this.startCuddle(); return; }   // 走到定位了：開始抱
     if (!next) {
       if (this.characters.some((who) => who.behind === character)) return;   // 被從後面抱著：跟抱人的同一個面向，不轉回正面
+      if (character.bedAt) return;   // 在床上抱著：維持抱的姿勢，不重擺坐姿
       if (["walk", "idle"].includes(character.anim) || seated(character)) {
         const seat = this.seatAt(character.pos);
         if (seat) {   // 坐下：斜前視角，背靠椅背（床頭）、面朝座面前方；家具圖有鏡射，人就反過來（床上腿伸直）；一起睡時床上的人往床頭躺平
@@ -350,6 +461,7 @@ export class RoomView {
   /** 畫在哪：面對面抱抱、親親時腳底跟對方同高、左右錯開 CUDDLE_SIDE_PX（斜角地板上站前後會一高一低）；從後面抱腳底也同高，躺著照 sleepSpot，其餘在自己的位置（存檔位置都不變）。 */
   drawnSpot(character) {
     if (character.drawnAt) return character.drawnAt;   // 鏡中的影像：位置由鏡子直接給
+    if (character.bedAt) return this.toScreen(character.bedAt.x + 0.5, character.bedAt.y + 0.5);   // 床上抱：strikeBedPose 排的位置
     if (character.cuddleAt && !character.behind) {
       const partner = character.cuddleWith;
       const [px, py] = this.toScreen(partner.pos.x + 0.5, partner.pos.y + 0.5);
@@ -397,8 +509,9 @@ export class RoomView {
     else if (deferring) memo.deferred++;
   }
 
-  /** 抱在一起的兩人（面對面抱抱、從後面抱、親親、抱著睡）：[上層的人, 下層的人]；沒有就 null。 */
+  /** 抱在一起的兩人（面對面抱抱、從後面抱、親親、床上抱、抱著睡）：[上層的人, 下層的人]；沒有就 null。床上抱的圖層由 drawBedEmbrace 自己排。 */
   embrace() {
+    if (this.bedPair) return this.bedPair.people;
     const hugger = this.characters.find((who) => who.anim === "hug" || who.behind || who.anim === "sleep_hug");
     const partner = hugger && (hugger.behind ?? (hugger.anim === "sleep_hug" ? this.characters.find((who) => who !== hugger && !who.visitor && lying(who)) : hugger.cuddleWith));
     if (!partner) return null;
@@ -411,12 +524,11 @@ export class RoomView {
    *  靠鏡頭那隻手＝骨架 zOrder 裡上臂排在後面的那隻；伸向畫面深處的前臂在動畫裡縮短（sy）。 */
   drawBackHug([top, bottom], time) {
     const hugger = top.behind ? top : bottom, held = hugger === top ? bottom : top;
-    const nearSide = (who) => { const z = who.skeletons[who.view].data.zOrder; return z.indexOf("upper_arm_l") > z.indexOf("upper_arm_r") ? "l" : "r"; };
     const bones = (who, keep) => new Set(who.skeletons[who.view].data.zOrder.filter(keep));
-    const near = nearSide(hugger), far = near === "l" ? "r" : "l";
+    const near = this.nearSide(hugger), far = near === "l" ? "r" : "l";
     if (hugger === bottom) {
       const wrap = new Set([`lower_arm_${near}`, `hand_${near}`, `hand_${far}`, "head"]);   // 遠側前臂伸向畫面深處被擋住不畫，手掌從對方另一側扣住腰；頭側靠在對方頭上
-      const heldSide = nearSide(held);
+      const heldSide = this.nearSide(held);
       const heldArm = new Set([`upper_arm_${heldSide}`, `lower_arm_${heldSide}`, `hand_${heldSide}`]);   // 被抱的人握住抱人環過來的手
       this.drawCharacter(held, time, null, "behind");   // 被抱的人的後髮夾在抱人的身體後面
       this.drawCharacter(hugger, time, bones(hugger, (bone) => !wrap.has(bone) && bone !== `lower_arm_${far}`));
@@ -428,7 +540,7 @@ export class RoomView {
     }
     const around = new Set([`lower_arm_${far}`]);
     const hands = new Set([`hand_${near}`, `hand_${far}`]);
-    const heldSide = nearSide(held);
+    const heldSide = this.nearSide(held);
     const heldArm = new Set([`upper_arm_${heldSide}`, `lower_arm_${heldSide}`, `hand_${heldSide}`]);
     this.drawCharacter(hugger, time, around);
     this.drawCharacter(held, time, bones(held, (bone) => !heldArm.has(bone)));
@@ -436,10 +548,51 @@ export class RoomView {
     this.drawCharacter(held, time, new Set([`upper_arm_${heldSide}`]));   // 前臂、手掌收在身前，被抱人的身體擋住
   }
 
+  /** 靠鏡頭那側的手腳是 l 還是 r：骨架 zOrder 裡上臂排在後面（畫在上層）的那隻。 */
+  nearSide(who) {
+    const z = who.skeletons[who.view].data.zOrder;
+    return z.indexOf("upper_arm_l") > z.indexOf("upper_arm_r") ? "l" : "r";
+  }
+
+  /** 床上抱的圖層（由下往上）：
+   *  並肩側抱：靠鏡頭那人遠側整隻手（藏在對方身後）→ 離鏡頭那人 → 靠鏡頭那人其餘。
+   *  圈抱（手和頭照站著從後面抱的 drawBackHug）：後面那人遠側的腿（墊在她下面）→ 前面那人的後髮 → 後面那人其餘（不含兩腿、環過去的手、頭）→ 前面那人其餘（不含握手那隻、遠側前臂與手掌）→ 後面那人近側的腿（接在臀部上、疊在她身上）→ 環過去的近側前臂、兩隻手掌與頭 → 前面那人握住他的那隻手。 */
+  drawBedEmbrace({ near, far, back, front, kiss }, time) {
+    const limb = (side, parts) => parts.map((part) => `${part}_${side}`);
+    const except = (who, skip) => new Set(who.skeletons[who.view].data.zOrder.filter((bone) => !skip.includes(bone)));
+    const other = (side) => (side === "l" ? "r" : "l");
+    if (kiss) {   // 並肩親親：靠鏡頭的人畫在上面，高的人的頭永遠最上面
+      const tallFar = heightOf(far) > heightOf(near);
+      this.drawCharacter(far, time, tallFar ? except(far, ["head"]) : null);
+      this.drawCharacter(near, time);
+      if (tallFar) this.drawCharacter(far, time, new Set(["head"]));
+      return;
+    }
+    if (near) {
+      const arm = limb(other(this.nearSide(near)), ["upper_arm", "lower_arm", "hand"]);
+      this.drawCharacter(near, time, new Set(arm));
+      this.drawCharacter(far, time);
+      this.drawCharacter(near, time, except(near, arm));
+      return;
+    }
+    const backNear = this.nearSide(back), backFar = other(backNear), frontNear = this.nearSide(front), frontFar = other(frontNear);
+    const nearLeg = limb(backNear, ["upper_leg", "lower_leg", "foot"]), farLeg = limb(backFar, ["upper_leg", "lower_leg", "foot"]);
+    const wrap = [`lower_arm_${backNear}`, `hand_${backNear}`, `hand_${backFar}`, "head"];
+    const heldArm = limb(frontNear, ["upper_arm", "lower_arm", "hand"]);
+    this.drawCharacter(back, time, new Set(farLeg));
+    this.drawCharacter(front, time, null, "behind");
+    this.drawCharacter(back, time, except(back, [...nearLeg, ...farLeg, ...wrap, `lower_arm_${backFar}`]));
+    this.drawCharacter(front, time, except(front, [...heldArm, `lower_arm_${frontFar}`, `hand_${frontFar}`]), "front");
+    this.drawCharacter(back, time, new Set(nearLeg));
+    this.drawCharacter(back, time, new Set(wrap));
+    this.drawCharacter(front, time, new Set(heldArm));
+  }
+
   /** 畫抱在一起的兩人，手才會繞到對方身後：
    *  站著（抱抱、親親）：上層那人下面的手 → 下層那人（除了下面那隻的前臂、手掌）→ 上層那人其餘 → 下層那人下面那隻的前臂、手掌（搭在對方後腰）；
    *  躺著（抱著睡）：上層那人下面的手 → 下層那人 → 上層那人其餘（下層那人上面的手收在自己臉旁，不蓋到對方身上）。 */
   drawEmbrace([top, bottom], time) {
+    if (this.bedPair) return this.drawBedEmbrace(this.bedPair, time);
     if (top.behind || bottom.behind) return this.drawBackHug([top, bottom], time);
     const armOf = (who, lower) => {
       const lowerSide = who.skeletons[who.view].lowerArm(who.samplePose(who.animations[who.anim], time, who.view));

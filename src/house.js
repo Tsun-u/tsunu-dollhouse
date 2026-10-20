@@ -117,7 +117,7 @@ export class House {
     if (changedRoom && this.selectedDoll) this.room.pets?.follow(this.selectedDoll.spot, this.personFor(this.selectedDoll));
     this.room.setCharacters(present);
     this.room.sleeping = !!this.sleepingOn;
-    if (this.room.pets) this.room.pets.fed = game.state.fed ?? {};
+    if (this.room.pets) { this.room.pets.fed = game.state.fed ?? {}; this.room.pets.costumes = game.state.petCostumes ?? {}; }
     this.renderRoomTabs();
     this.renderInventory();
     this.renderPieceActions();
@@ -418,7 +418,20 @@ export class House {
       ...(hasSnacks ? [button("給零食", () => this.act({ kind: "feed", dog, food: "snack" }))] : []),
       ...Object.entries(pets[dog]?.touches ?? {}).map(([touch, spec]) => button(spec.label, () => this.act({ kind: "pet", dog, touch }))),
       ...(dog === "black" ? [button("丟球", () => this.act({ kind: "throw_ball" }))] : []),
+      ...this.costumeCards(dog),
     );
+  }
+
+  /** 狗的裝扮：每套一張圖卡，點了穿上，穿著的亮框、再點一次脫掉。 */
+  costumeCards(dog) {
+    const worn = this.deps.game.state.petCostumes?.[dog] ?? null;
+    return Object.entries(this.deps.content.pets[dog]?.costumes ?? {}).map(([costume, spec]) => {
+      const card = Object.assign(document.createElement("button"), { className: "card" + (worn === costume ? " on" : ""), type: "button" });
+      card.setAttribute("aria-label", worn === costume ? `脫掉${spec.label}` : `穿${spec.label}`);
+      card.append(trimmedImage(spec.images.stand, () => this.renderDog()), Object.assign(document.createElement("span"), { className: "card-label", textContent: spec.label }));
+      card.onclick = () => this.act({ kind: "dress_dog", dog, costume: worn === costume ? null : costume });
+      return card;
+    });
   }
 
   /** 桌上的東西（點了拿走，家常菜是吃掉；寫是哪個娃娃放的）與可以放上去的商品、家常菜；一張桌子最多 3 樣。 */

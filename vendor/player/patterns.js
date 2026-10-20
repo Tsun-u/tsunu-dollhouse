@@ -2,7 +2,7 @@
 // 代號與中文名在規則 src/looks.ts 的 PATTERNS（test/patterns.test.ts 鎖住兩邊一致）。
 
 /** 每種花紋一個週期（原圖像素）。人物在遊戲裡約縮成 1/14：56 在畫面上大約 4 px、84 大約 6 px。 */
-export const PATTERN_PERIOD = { plaid: 84, stripes_h: 56, stripes_v: 56, dots: 56, houndstooth: 84 };
+export const PATTERN_PERIOD = { plaid: 84, stripes_h: 56, stripes_v: 56, dots: 56, houndstooth: 84, fishnet: 40 };   // 漁網 40：遊戲大小還看得出是網、放大不會太粗
 const SAMPLES = [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]];   // 一個像素取四點平均，邊緣不鋸齒
 const frac = (value) => value - Math.floor(value);
 
@@ -17,7 +17,12 @@ const SHAPES = {
     if (u >= 0.5 && v >= 0.5) return 0;
     return frac(2 * (u + v)) < 0.5 ? 1 : 0;
   },
+  fishnet: (u, v) => {   // 兩組斜線交成菱形網：線（畫面上約 1 px）是花紋，網眼是底色；透膚的衣服網眼直接透明
+    const onLine = (t) => Math.min(frac(t), 1 - frac(t)) < FISHNET_LINE;
+    return onLine(u + v) || onLine(u - v) ? 1 : 0;
+  },
 };
+const FISHNET_LINE = 0.16;   // 斜線占週期的比例（兩邊各 0.16，線寬約週期的 0.32／√2）
 
 export function patternCoverage(pattern, x, y, period = PATTERN_PERIOD[pattern]) {
   const shape = SHAPES[pattern];
@@ -32,8 +37,8 @@ export function patternCoverage(pattern, x, y, period = PATTERN_PERIOD[pattern])
 
 export const hexRgb = (hex) => [1, 3, 5].map((k) => parseInt(hex.slice(k, k + 2), 16));
 export const dyeColor = (dye) => (typeof dye === "string" ? dye : dye.color);
-/** 染色快取的鍵：素色是色碼，花紋是三個欄位接起來。 */
-export const dyeCacheKey = (dye) => (typeof dye === "string" ? dye : `${dye.color}/${dye.pattern}/${dye.patternColor}`);
+/** 染色快取的鍵：素色是色碼，花紋是三個欄位接起來；透膚（sheer）另外標。 */
+export const dyeCacheKey = (dye) => (typeof dye === "string" ? dye : `${dye.color}/${dye.pattern}/${dye.patternColor}${dye.sheer ? "/sheer" : ""}`);
 
 /** 小預覽：把 canvas 塗成這個染法（色票、衣服小卡用），花紋縮到看得出兩個半週期。 */
 export function paintSwatch(canvas, dye) {

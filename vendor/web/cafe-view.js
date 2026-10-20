@@ -199,7 +199,7 @@ export class CafeView {
       if (this.dress.dyeable(spec)) colors[id] = this.looks.randomDye(pick, this.looks.CLOTHES_COLORS);
     };
     put("top");
-    const dress = this.clothes[worn.top]?.category === "dress";
+    const dress = this.dress.coversHips(this.clothes[worn.top]);
     if (!dress) put("bottom");
     for (const [slot, chance] of Object.entries(EXTRA_LAYERS)) if (pick(ROLLS) < chance && !(dress && slot === "overskirt")) put(slot);
     put("shoes");

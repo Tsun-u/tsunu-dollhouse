@@ -387,3 +387,4 @@ h2.section[hidden] { display: none; }
 @media (max-width: 560px) { #dollList { grid-template-columns: repeat(2, 1fr); gap: 8px; } .doll-add { min-height: 150px; } }   /* 手機：娃娃卡一排兩張 */
 .card .thumb.pending { display: block; border-radius: 10px; background: #f3e6d0; }   /* 縮圖還在畫 */
 .thumb.trimmed { display: block; background-repeat: no-repeat; background-position: center; }   /* 家具圖：只露出有東西的那塊 */
+#dogActions { align-items: center; }   /* 裝扮圖卡比文字鈕高，文字鈕不要被撐長 */

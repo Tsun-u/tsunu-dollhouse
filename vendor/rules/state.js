@@ -1,4 +1,4 @@
-import { CATEGORY_SLOT, SLOT_LABEL } from "./clothing.js";
+import { CATEGORY_SLOT, HIP_CATEGORIES, SLOT_LABEL } from "./clothing.js";
 import { BODIES, dyePattern, normalizeDye, patternLabel, sameDye } from "./looks.js";
 import { createBoard, finale, random, swap } from "./match3.js";
 import { createWorkshop, moveOrMerge, putMaterial } from "./workshop.js";
@@ -79,9 +79,23 @@ export function createInitialState() {
 export function createBedroom(placed, width = 8, depth = 8) {
     return { kind: FIRST_ROOM, name: "臥室", width, depth, placed, doors: [] };
 }
+/** 在不在家：阿宇看 MCP 連線，阿童看她按的「出門／回家」（舊存檔沒有這欄＝在家）。 */
+export function isHome(state, who) {
+    return who === "tsunu" ? state.tsunu.home : state.atone?.home ?? true;
+}
+const PRESENCE_NOTE = "出門一下，晚點回來。";
+/** 身體要在屋裡才做得了的事：不在家的人要先回家。聊天、三消、工坊、店面（街上的事）不在這裡。 */
+const HOME_BODY_KINDS = new Set([
+    "place", "move", "flip", "store", "wear", "dress", "dye_clothes", "open_door", "close_door", "say_guests", "paint_furniture", "wash", "cook", "eat", "pet", "feed", "dress_dog",
+    "toggle", "tv_channel", "read", "shelve", "water", "put_on_table", "take_from_table", "give", "hug", "kiss", "call", "answer_invite", "sleep", "wake", "throw_ball", "throw_pillow",
+    "walk", "wave", "build_room", "decorate_room",
+]);
 /** 套用一個動作，回傳新狀態；不合法就丟錯、狀態不變。每個成功動作 revision +1，值得記的動作寫一筆日誌。 */
 export function applyAction(state, action, context) {
-    const { state: next, note, tier, chain, earned, to } = reduce(state, action, context);
+    if (context.actor !== "game" && !context.doer && !isHome(state, context.actor) && HOME_BODY_KINDS.has(action.kind))
+        throw new Error(`${ACTOR_NAME[context.actor]}不在家，先回家。`);
+    const { state: reduced, note, tier, chain, earned, to } = reduce(state, action, context);
+    const next = releaseCuddle(state, reduced);
     const quiet = (tier ?? (DIGEST_KINDS.has(action.kind) ? "digest" : "live")) === "digest";
     const entry = { at: context.now().toISOString(), actor: context.actor, ...(context.doer ? { who: context.doer.name } : {}), text: note ?? "", kind: action.kind, ...(quiet ? { quiet: true } : {}), ...(chain ? { chain } : {}), ...(earned ? { earned } : {}), ...(to ? { to } : {}) };
     const last = next.journal.at(-1);
@@ -89,6 +103,56 @@ export function applyAction(state, action, context) {
         && context.now().getTime() - Date.parse(last.at) < TWEAK_WINDOW_MS; // 在調色盤上一格一格試顏色：只留第一筆，不每點一下就記一筆、推一則
     const journal = note === null || repeated ? next.journal : [...next.journal, entry].slice(-JOURNAL_LIMIT);
     return { ...next, revision: state.revision + 1, journal };
+}
+/** 抱著的兩人有誰換了位置、或有人不在家：放開（跟睡覺一樣，走動就醒）。只看動作之前就抱著的那份：抱抱這個動作自己會把人移到對方旁邊。 */
+function releaseCuddle(before, after) {
+    if (!before.cuddle || after.cuddle !== before.cuddle)
+        return after;
+    const moved = ["atone", "tsunu"].some((who) => {
+        const [a, b] = [before.positions[who], after.positions[who]];
+        return a.room !== b.room || a.x !== b.x || a.y !== b.y;
+    });
+    return moved || !isHome(after, "tsunu") || !isHome(after, "atone") ? withoutCuddle(after) : after;
+}
+const AREA_SLOTS = { upper: ["innerTop", "top"], lower: ["bottom", "overskirt"], feet: ["shoes"] };
+const DOOR_OUTFIT = {
+    atone: { upper: "tee_gray", lower: "pinafore_gray", feet: "shoes_gray" },
+    tsunu: { upper: "shirt_gray", lower: "pants_gray", feet: "shoes_gray" },
+};
+/** 開門前整理服儀：哪一區空著（或穿的是只給家裡人看的衣服）就補上基本款，身上其他的不動；基本款不在衣櫃就跳過。
+ *  洋裝穿在上衣格、一件蓋到下身，所以下身也算有穿。回傳新的穿著與補上的衣服名字。 */
+function tidyForGuests(state, who, clothes) {
+    const worn = { ...state.worn[who] };
+    const decent = (slot) => { const item = worn[slot]; return !!item && !clothes[item]?.intimate; };
+    const wearingDress = decent("top") && HIP_CATEGORIES.has(clothes[worn.top]?.category ?? "");
+    const covered = (area) => AREA_SLOTS[area].some(decent) || (area === "lower" && wearingDress);
+    const added = [];
+    for (const area of Object.keys(AREA_SLOTS)) {
+        if (covered(area))
+            continue;
+        const item = DOOR_OUTFIT[who][area];
+        const spec = clothes[item];
+        if (!spec || (state.wardrobe[item] ?? 0) < 1)
+            continue;
+        worn[CATEGORY_SLOT[spec.category]] = item;
+        added.push(spec.label);
+    }
+    return { worn, added };
+}
+/** 這個人離開床（出門）之後的睡覺狀態：一個人睡的就醒了，一起睡的剩對方一個人睡。 */
+function sleepingWithout(state, who) {
+    if (!state.sleeping)
+        return null;
+    if (state.sleeping.alone === who)
+        return null;
+    if (state.sleeping.alone)
+        return state.sleeping;
+    return { since: state.sleeping.since, alone: who === "atone" ? "tsunu" : "atone" };
+}
+/** 拿掉 cuddle 欄位（存檔裡不留 undefined）。 */
+function withoutCuddle(state) {
+    const { cuddle: _released, ...rest } = state;
+    return rest;
 }
 /** 會連續微調的動作（試顏色）：同一個人、同一句話在這段時間內重複，日誌只記一筆。 */
 const TWEAK_KINDS = new Set(["paint_furniture", "dye_clothes"]);
@@ -338,8 +402,8 @@ function reduce(state, action, context) {
             if (!action.product)
                 throw new Error("要遞什麼？");
             const to = context.actor === "atone" ? "tsunu" : "atone";
-            if (to === "tsunu" && !state.tsunu.home)
-                throw new Error("阿宇不在家，先放在桌上吧。");
+            if (!isHome(state, to))
+                throw new Error(`${ACTOR_NAME[to]}不在家，先放在桌上吧。`);
             if ((state.products[action.product] ?? 0) < 1)
                 throw new Error(`沒有${productLabel(action.product)}可以遞。`);
             const products = adjust(state.products, action.product, -1);
@@ -351,8 +415,9 @@ function reduce(state, action, context) {
         case "puzzle_start": {
             if (state.puzzle && state.puzzle.movesLeft > 0)
                 throw new Error("這一盤還沒打完。");
-            if (action.coop && !state.tsunu.home)
-                throw new Error("阿宇不在家，沒辦法一起玩。");
+            const partner = context.actor === "tsunu" ? "atone" : "tsunu";
+            if (action.coop && !isHome(state, partner))
+                throw new Error(`${ACTOR_NAME[partner]}不在家，沒辦法一起玩。`);
             const shopKind = action.shop ?? "cafe";
             const shop = openedShop(state, shopKind);
             const stamina = spendStamina(state, context);
@@ -514,10 +579,16 @@ function reduce(state, action, context) {
                 throw new Error("小屋自己不開門。");
             if (state.door?.open)
                 throw new Error("門已經開著了。");
-            const [atoneSpot, tsunuSpot] = entranceSpots(state, furniture, 2, []); // 開門前清乾淨：兩人都起床、出浴缸，到客廳門口
-            if (!atoneSpot || !tsunuSpot)
+            const hosts = ["atone", "tsunu"].filter((who) => isHome(state, who)); // 開門前清乾淨：在家的都起床、出浴缸，到客廳門口，補齊服儀
+            const spots = entranceSpots(state, furniture, hosts.length, []);
+            if (spots.length < hosts.length)
                 throw new Error("客廳門口擠不下兩個人，先挪一下家具。");
-            return { state: { ...state, door: { open: true, by: context.actor, at: context.now().toISOString() }, sleeping: null, positions: { atone: atoneSpot, tsunu: tsunuSpot } }, note: "打開門讓客人進來" };
+            const positions = { ...state.positions, ...Object.fromEntries(hosts.map((who, index) => [who, spots[index]])) };
+            const tidied = hosts.map((who) => [who, tidyForGuests(state, who, clothes)]);
+            const worn = Object.fromEntries(tidied.map(([who, { worn }]) => [who, worn]));
+            const dressed = tidied.filter(([, { added }]) => added.length).map(([who, { added }]) => `${ACTOR_NAME[who]}穿上${added.join("、")}`);
+            const note = dressed.length ? `打開門讓客人進來（開門前${dressed.join("、")}）` : "打開門讓客人進來";
+            return { state: { ...withoutCuddle(state), door: { open: true, by: context.actor, at: context.now().toISOString() }, sleeping: null, positions, worn: { ...state.worn, ...worn } }, note };
         }
         case "close_door": {
             if (context.actor === "game")
@@ -571,8 +642,8 @@ function reduce(state, action, context) {
             if (state.door?.open)
                 throw new Error(`有客人在，先不要一起${verb}。`);
             const partner = context.actor === "atone" ? "tsunu" : "atone";
-            if (partner === "tsunu" && !state.tsunu.home)
-                throw new Error("阿宇不在家。");
+            if (!isHome(state, partner))
+                throw new Error(`${ACTOR_NAME[partner]}不在家。`);
             const spot = freeSpotBeside(room, basin, here, furniture, visitorCells(state, here.room));
             if (!spot)
                 throw new Error("洗手台前擠不下兩個人。");
@@ -582,16 +653,7 @@ function reduce(state, action, context) {
         case "cook": {
             if (context.actor === "game")
                 throw new Error("小屋自己不煮飯。");
-            const dish = context.content.dishes[action.dish];
-            if (!dish)
-                throw new Error(`不會煮「${action.dish}」。`);
-            const here = standingSpot(state, context);
-            if (!pieceNextTo(findRoom(state, here.room), here, furniture, (spec) => !!spec.stove))
-                throw new Error("要先走到爐台前。");
-            const missing = Object.entries(dish.ingredients).filter(([chain, need]) => (state.materials[chain] ?? 0) < need);
-            if (missing.length)
-                throw new Error(`材料不夠：${missing.map(([chain, need]) => `${recipes[chain]?.label ?? chain}要 ${need} 個（有 ${state.materials[chain] ?? 0}）`).join("、")}。`);
-            const materials = Object.entries(dish.ingredients).reduce((have, [chain, need]) => adjust(have, chain, -need), state.materials);
+            const { materials, dish } = cookDish(state, context.content, standingSpot(state, context), action.dish);
             return { state: { ...state, materials, dishes: adjust(state.dishes, action.dish, 1) }, note: `煮了一份${dish.label}` };
         }
         case "eat": {
@@ -613,6 +675,11 @@ function reduce(state, action, context) {
             if (context.actor === "game")
                 throw new Error("小屋自己不餵狗。");
             return feedDog(state, context.content, action.dog, action.food, context.now());
+        }
+        case "dress_dog": {
+            if (context.actor === "game")
+                throw new Error("小屋自己不幫狗換裝。");
+            return dressDog(state, pets, action.dog, action.costume);
         }
         case "toggle":
             return toggleSwitch(state, furniture, action.id, context.seed());
@@ -675,7 +742,7 @@ function reduce(state, action, context) {
                 throw new Error("桌上沒有這樣東西。");
             const rest = items.filter((_, i) => i !== action.index);
             const mine = item.by === context.actor && item.name === context.doer?.name; // 兒童版同一個 actor 有好幾個娃娃，連名字一起比
-            const who = mine ? "自己" : item.name ?? ACTOR_NAME[item.by];
+            const who = mine ? "自己" : cookName(item);
             if (item.kind === "note")
                 return { state: replacePlaced(state, { ...piece, items: rest }), note: `收起${who}留的紙條：${item.text}`, ...(!mine ? { tier: "live" } : {}) };
             if (item.kind === "dish") { // 桌上的家常菜拿起來就是吃掉：阿童吃了回體力
@@ -694,30 +761,33 @@ function reduce(state, action, context) {
             if (context.actor === "game")
                 throw new Error("小屋自己不抱人。");
             const target = context.actor === "atone" ? "tsunu" : "atone";
-            if (!state.tsunu.home)
-                throw new Error("阿宇不在家。");
+            if (!isHome(state, target))
+                throw new Error(`${ACTOR_NAME[target]}不在家。`);
             if (state.door?.open)
                 throw new Error("有客人在，先不要抱抱、親親。");
             const behind = action.kind === "hug" && action.from === "behind";
-            const verb = action.kind === "kiss" ? "親了一下" : behind ? "從後面抱住" : "抱了一下";
+            const verb = action.kind === "kiss" ? "親了一下" : behind ? "從後面抱住" : "抱住";
             const note = `${verb}${ACTOR_NAME[target]}`;
+            const held = action.kind === "hug" ? { cuddle: { by: context.actor, behind } } : {};
             if (sameSeat(state, furniture)) { // 並肩坐在同一張沙發或床上：就地抱，不挪位子；一起睡時抱住就抱著睡，不會醒
                 if (state.sleeping && !state.sleeping.alone && action.kind === "hug")
                     return { state: { ...state, sleeping: { ...state.sleeping, cuddledBy: context.actor } }, note: `${note}，抱著一起睡` };
-                return { state, note };
+                return { state: { ...state, ...held }, note };
             }
+            if (action.kind === "kiss" && state.cuddle)
+                return { state, note }; // 抱著時親親：不挪位子，親完繼續抱
             const spot = state.positions[target];
             const cell = cuddleSpot(findRoom(state, spot.room), spot, behind, furniture, visitorCells(state, spot.room));
             if (!cell)
                 throw new Error(`${ACTOR_NAME[target]}旁邊沒有位子可以靠過去。`);
-            return { state: { ...state, positions: { ...state.positions, [context.actor]: { room: spot.room, ...cell } } }, note };
+            return { state: { ...state, ...held, positions: { ...state.positions, [context.actor]: { room: spot.room, ...cell } } }, note };
         }
         case "call": {
             if (context.actor === "game")
                 throw new Error("小屋自己不叫人。");
             const target = context.actor === "atone" ? "tsunu" : "atone";
-            if (target === "tsunu" && !state.tsunu.home)
-                throw new Error("阿宇不在家，叫不到。");
+            if (!isHome(state, target))
+                throw new Error(`${ACTOR_NAME[target]}不在家，叫不到。`);
             const spot = state.positions[context.actor];
             const cell = cuddleSpot(findRoom(state, spot.room), spot, false, furniture, visitorCells(state, spot.room));
             if (!cell)
@@ -748,15 +818,18 @@ function reduce(state, action, context) {
             const bed = seatAt(findRoom(state, spot.room), spot, furniture);
             if (!bed || furniture[bed.item]?.seatPose !== "lounge")
                 throw new Error("要先躺到床上才能睡。");
-            const together = state.tsunu.home && sameSeat(state, furniture)?.id === bed.id;
+            const together = isHome(state, actor === "atone" ? "tsunu" : "atone") && sameSeat(state, furniture)?.id === bed.id;
             if (state.sleeping && (!state.sleeping.alone || state.sleeping.alone === actor))
                 throw new Error("已經在睡了。");
             if (state.sleeping && !together)
                 throw new Error(`${ACTOR_NAME[state.sleeping.alone]}在別張床上睡。`);
             if (together && state.door?.open)
                 throw new Error("有客人在，先不要一起睡。");
-            if (together)
-                return { state: { ...state, sleeping: { since: state.sleeping?.since ?? context.now().toISOString() } }, note: state.sleeping ? `躺到${ACTOR_NAME[state.sleeping.alone]}旁邊一起睡了` : "兩個人一起睡了" };
+            if (together) { // 床上抱著時一起睡：變成抱著睡
+                const cuddledBy = state.cuddle ? { cuddledBy: state.cuddle.by } : {};
+                const note = state.sleeping ? `躺到${ACTOR_NAME[state.sleeping.alone]}旁邊一起睡了` : state.cuddle ? "抱著一起睡了" : "兩個人一起睡了";
+                return { state: { ...withoutCuddle(state), sleeping: { since: state.sleeping?.since ?? context.now().toISOString(), ...cuddledBy } }, note };
+            }
             return { state: { ...state, sleeping: { since: context.now().toISOString(), alone: actor } }, note: `躺在${label(bed.item)}上睡覺了` };
         }
         case "wake": {
@@ -904,12 +977,18 @@ function reduce(state, action, context) {
             return { state: { ...withShop(state, action.shop, { ...shop, decor: bought }), money: state.money - spot.price }, note: `幫${where}買了${theme}的款式（花了 ${spot.price}）` };
         }
         case "presence": {
-            const note = action.note ?? state.tsunu.note;
-            if (!action.home)
-                return { state: { ...state, tsunu: { home: false, note, leftAt: context.now().toISOString() } }, note: "阿宇出門了" };
-            const reconnected = state.tsunu.home || (!!state.tsunu.leftAt && context.now().getTime() - Date.parse(state.tsunu.leftAt) < RECONNECT_GRACE_MS); // 本來就在家：新連線比舊連線的出門先到
-            const positions = reconnected ? state.positions : { ...state.positions, tsunu: HOME_SPOTS.tsunu };
-            return { state: { ...state, tsunu: { home: true, note }, positions }, note: "阿宇回家了" };
+            const who = action.who ?? (context.actor === "atone" ? "atone" : "tsunu");
+            const before = (who === "tsunu" ? state.tsunu : state.atone) ?? { home: true, note: PRESENCE_NOTE };
+            const note = action.note ?? before.note;
+            const withPresence = (presence) => (who === "tsunu" ? { ...state, tsunu: presence } : { ...state, atone: presence });
+            if (!action.home) {
+                const left = withPresence({ home: false, note, leftAt: context.now().toISOString() });
+                const sleeping = who === "atone" ? sleepingWithout(state, "atone") : state.sleeping; // 阿童按出門是真的走了；阿宇的出門可能只是斷線，睡著的留著等他重連
+                return { state: { ...left, sleeping }, note: `${ACTOR_NAME[who]}出門了` };
+            }
+            const reconnected = before.home || (!!before.leftAt && context.now().getTime() - Date.parse(before.leftAt) < RECONNECT_GRACE_MS); // 本來就在家：新連線比舊連線的出門先到
+            const positions = reconnected ? state.positions : { ...state.positions, [who]: HOME_SPOTS[who] };
+            return { state: { ...withPresence({ home: true, note }), positions }, note: `${ACTOR_NAME[who]}回家了` };
         }
         default: { // HTTP 送來的 kind 打錯時走到這裡；新增動作卻漏寫 case 則在編譯時報錯
             const unknown = action;
@@ -954,9 +1033,9 @@ export function freeCellsNear(state, roomId, origin, catalog, taken) {
     return openCells(findRoom(state, roomId), catalog).filter((cell) => !busy.has(cellKey(cell)))
         .sort((a, b) => distance(a) - distance(b)).map((cell) => ({ room: roomId, ...cell }));
 }
-/** 屋裡有人站的位置：阿童、在家的阿宇、訪客（except 那位訪客不算）。 */
+/** 屋裡有人站的位置：在家的阿童、阿宇，與訪客（except 那位訪客不算）。 */
 export function peopleSpots(state, except) {
-    return [state.positions.atone, ...(state.tsunu.home ? [state.positions.tsunu] : []),
+    return [...["atone", "tsunu"].filter((who) => isHome(state, who)).map((who) => state.positions[who]),
         ...Object.entries(state.visitors ?? {}).filter(([id]) => id !== except).map(([, visitor]) => visitor.spot)];
 }
 /** 這間房裡訪客站的格子（"x,y"）：給人找位子時跳過。 */
@@ -1080,6 +1159,22 @@ export function petDog(pets, dogId, touch) {
         throw new Error(`${dog.label}沒有「${touch}」這個互動。`);
     return found.note;
 }
+/** 幫狗穿上裝扮（pets.json 那隻狗的 costumes 之一）或脫掉（null）。 */
+export function dressDog(state, pets, dogId, costumeId) {
+    const dog = pets[dogId];
+    if (!dog)
+        throw new Error(`家裡沒有「${dogId}」這隻狗。`);
+    const { [dogId]: current, ...others } = state.petCostumes ?? {};
+    if (costumeId === null) {
+        if (!current)
+            throw new Error(`${dog.label}身上沒穿裝扮。`);
+        return { state: { ...state, petCostumes: others }, note: `幫${dog.label}脫掉${dog.costumes?.[current]?.label ?? current}` };
+    }
+    const costume = dog.costumes?.[costumeId];
+    if (!costume)
+        throw new Error(`${dog.label}沒有「${costumeId}」這套裝扮。`);
+    return { state: { ...state, petCostumes: { ...others, [dogId]: costumeId } }, note: `幫${dog.label}穿上${costume.label}` };
+}
 /** 餵狗：零食要家裡有零食櫃；正餐吃完 FULL_HOURS 小時內還飽，誰餵都算吃過。 */
 export function feedDog(state, content, dogId, food, now) {
     const dog = content.pets[dogId];
@@ -1164,19 +1259,22 @@ export function throwPillow(state, thrower, target) {
 function hostAsleep(state, host) {
     return !!state.sleeping && (!state.sleeping.alone || state.sleeping.alone === host);
 }
-/** 屋裡的人站在哪：阿宇要在家、訪客要在屋裡。 */
+/** 屋裡的人站在哪：阿童、阿宇要在家、訪客要在屋裡。 */
 function personSpot(state, id) {
-    if (id === "atone")
-        return state.positions.atone;
-    if (id === "tsunu") {
-        if (!state.tsunu.home)
-            throw new Error("阿宇不在家。");
-        return state.positions.tsunu;
+    if (id === "atone" || id === "tsunu") {
+        assertHostHome(state, id);
+        return state.positions[id];
     }
     const visitor = state.visitors?.[id];
     if (!visitor)
         throw new Error("屋裡沒有這位客人。");
     return visitor.spot;
+}
+/** 找阿童、阿宇時他要在家。客人不知道阿童住這裡，她不在就只說屋裡沒有這個人。 */
+export function assertHostHome(state, host) {
+    if (isHome(state, host))
+        return;
+    throw new Error(host === "tsunu" ? "阿宇不在家。" : "屋裡沒有這個人。");
 }
 function personAsleep(state, id) {
     return id === "atone" || id === "tsunu" ? hostAsleep(state, id) : !!state.visitors?.[id]?.asleep;
@@ -1226,8 +1324,32 @@ export function returnHolding(state, visitor, catalog) {
 /** 桌上食物的叫法：「阿童煮的蛋餅」「一份布丁」。 */
 export function foodName(item, content) {
     if (item.kind === "dish")
-        return `${ACTOR_NAME[item.by]}煮的${item.text ?? content.dishes[item.dish]?.label ?? item.dish}`;
+        return `${cookName(item)}煮的${item.text ?? content.dishes[item.dish]?.label ?? item.dish}`;
     return `${heldClothes(item, content) ? "一件" : "一份"}${content.recipes[item.chain]?.tiers.at(-1) ?? item.chain}`;
+}
+/** 這樣東西是誰放的、誰煮的：兒童版的娃娃與客人記名字，阿童、阿宇照稱呼。 */
+function cookName(item) {
+    return item.by === "guest" ? item.name ?? "客人" : item.name ?? ACTOR_NAME[item.by];
+}
+/** 煮家常菜的共用規則（阿童、阿宇煮進家裡的菜，客人煮的拿在手上）：要站在爐台旁、家裡的材料要夠；回傳扣掉材料後的材料與這道菜。
+ *  showCounts：材料不夠時要不要把數量寫進訊息（客人看不到家裡的材料數）。 */
+export function cookDish(state, content, spot, dishId, showCounts = true) {
+    const dish = content.dishes[dishId];
+    if (!dish)
+        throw new Error(`不會煮「${dishId}」。`);
+    if (!pieceNextTo(findRoom(state, spot.room), spot, content.furniture, (spec) => !!spec.stove))
+        throw new Error("要先走到爐台前。");
+    const missing = Object.entries(dish.ingredients).filter(([chain, need]) => (state.materials[chain] ?? 0) < need);
+    if (missing.length && !showCounts)
+        throw new Error(`材料不夠，煮不了${dish.label}。`);
+    if (missing.length)
+        throw new Error(`材料不夠：${missing.map(([chain, need]) => `${content.recipes[chain]?.label ?? chain}要 ${need} 個（有 ${state.materials[chain] ?? 0}）`).join("、")}。`);
+    const materials = Object.entries(dish.ingredients).reduce((have, [chain, need]) => adjust(have, chain, -need), state.materials);
+    return { materials, dish };
+}
+/** 現在家裡的材料夠煮的菜（id）。 */
+export function cookableDishes(state, content) {
+    return Object.entries(content.dishes).filter(([, dish]) => Object.entries(dish.ingredients).every(([chain, need]) => (state.materials[chain] ?? 0) >= need)).map(([id]) => id);
 }
 /** 這樣東西是不是衣服（服飾店做的商品）：是的話回傳穿起來是哪件衣服的代號，不能吃。 */
 export function heldClothes(item, content) {

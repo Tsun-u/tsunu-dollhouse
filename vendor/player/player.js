@@ -39,6 +39,8 @@ const PART_RETRIES = 3;        // 零件圖載不到時最多再試幾次（網�
 const PART_RETRY_MS = 5000;    // 載不到之後隔多久才允許再試
 const DYE_LINE_LUM = 0.25;   // 比這暗的像素算輪廓線，不算進布料的平均亮度
 const DYE_MAX_GAIN = 1.25;  // 亮部最多比目標色亮這麼多（再亮就被截成目標色的 1.25 倍）
+const SHEER_LINE_FULL = 0.5;   // 透膚衣服：亮度低於布料平均的這個比例就整個算輪廓線
+const SHEER_LINE_TOP = 0.8;    // 高於這個比例就是布料（透明）；中間漸變，皺褶的陰影只留一點
 const GARMENT_AFTER = { lower_leg_l: "foot_l", lower_leg_r: "foot_r", lower_arm_l: "hand_l", lower_arm_r: "hand_r" };
 // 灰稿素體（骨架檔 skinGray）的漸層對應：像素亮度 ÷ 全身平均亮度（skinBase）＝ 相對亮度，照下面幾個點內插出顏色。
 // 每個點是主膚色的倍率（暗部偏暖：紅掉得少、藍掉得多），暖色偏移與陰影深度照膚色深淺收斂（見 shadowRatio）；
@@ -187,7 +189,8 @@ export class Skeleton {
   }
 
   /** 衣服染色（dye：色碼，或 { color, pattern, patternColor } 花紋）：先去色，每個像素的亮度除以這片布的平均亮度（不算深色輪廓線），再乘上目標色。
-   *  花紋：目標色照那一點被花紋蓋住多少，在底色與花紋色之間混；花紋座標用原圖座標（裁切前），同一件衣服拆出來的各片接得上。 */
+   *  花紋：目標色照那一點被花紋蓋住多少，在底色與花紋色之間混；花紋座標用原圖座標（裁切前），同一件衣服拆出來的各片接得上。
+   *  透膚（dye.sheer，漁網背心）：布料的像素只留花紋蓋住的部分（網線），其餘透明；輪廓線照原本的深淺留著。 */
   dyed(slot, dye) {
     const key = `dye|${slot}|${dyeCacheKey(dye)}`;
     if (!this.tintCache) this.tintCache = new Map();
@@ -205,13 +208,19 @@ export class Skeleton {
     const base = count ? sum / count : 1;
     const target = hexRgb(dyeColor(dye));
     const mark = typeof dye === "string" ? null : hexRgb(dye.patternColor);
+    const sheer = typeof dye === "object" && !!dye.sheer;
     const [ox, oy] = this.offsetOf(slot);
     const width = canvas.width;
     for (let i = 0; i < px.length; i += 4) {
       if (!px[i + 3]) continue;
-      const g = Math.min(DYE_MAX_GAIN, lum(i) / base);
+      const l = lum(i);
+      const g = Math.min(DYE_MAX_GAIN, l / base);
       const t = mark ? patternCoverage(dye.pattern, ox + ((i / 4) % width), oy + Math.floor(i / 4 / width)) : 0;
       for (let k = 0; k < 3; k++) px[i + k] = Math.min(255, Math.round((target[k] + (mark ? (mark[k] - target[k]) * t : 0)) * g));
+      if (sheer) {   // 輪廓線留著（比布料平均亮度暗得多的像素；灰稿的輪廓是中灰，不到 DYE_LINE_LUM），布料只留網線
+        const line = Math.max(0, Math.min(1, (SHEER_LINE_TOP * base - l) / ((SHEER_LINE_TOP - SHEER_LINE_FULL) * base)));
+        px[i + 3] = Math.round(px[i + 3] * Math.max(line, t));
+      }
     }
     c.putImageData(image, 0, 0);
     this.tintCache.set(key, canvas);

@@ -4,7 +4,7 @@
 
 /** 衣服大類穿在哪一格（跟伺服器 src/catalog.ts 的 CATEGORY_SLOT 同一組）。 */
 export const CATEGORY_SLOT = {
-  camisole: "innerTop", tee: "top", tank: "top", hoodie: "top", shirt: "top", pajama_top: "top", boyfriend_shirt: "top", dress: "top", coat: "coat", apron: "wrap", cape: "wrap", scarf: "wrap",
+  camisole: "innerTop", tee: "top", tank: "top", hoodie: "top", shirt: "top", pajama_top: "top", boyfriend_shirt: "top", dress: "top", pumpkin_suit: "top", coat: "coat", apron: "wrap", cape: "wrap", scarf: "wrap",
   leggings: "leggings", tights: "leggings", shorts: "bottom", pants: "bottom", wide_pants: "bottom", pajama_pants: "bottom", skirt: "bottom", pinafore: "overskirt", overalls: "overskirt", socks: "socks", shoes: "shoes", bowtie: "accessory", tie: "accessory",
 };
 export const SLOT_LABEL = { innerTop: "內搭衣", top: "上衣", coat: "外套", wrap: "罩衫", leggings: "內搭褲", bottom: "下衣", overskirt: "罩裙", socks: "襪子", shoes: "鞋子", accessory: "飾品" };
@@ -12,29 +12,39 @@ export const SLOT_LABEL = { innerTop: "內搭衣", top: "上衣", coat: "外套"
 /** 由底到頂的畫法：上衣紮進下衣（tucked）就畫在下衣底下，不紮的（T 恤）畫在下衣上面；罩裙在外套底下；鞋子在下衣底下，褲管才蓋得住鞋口；
  *  飾品（蝴蝶結、領帶）蓋在上衣和罩裙上、敞開的外套底下。 */
 const UPPER_SLOTS = new Set(["innerTop", "top", "coat", "wrap", "accessory"]);
-const HIP_CATEGORIES = new Set(["dress", "boyfriend_shirt"]);   // 放在上衣格、但下襬一路蓋到大腿
+const HIP_CATEGORIES = new Set(["dress", "boyfriend_shirt", "pumpkin_suit"]);   // 放在上衣格、但下襬一路蓋到大腿（跟伺服器 src/clothing.ts 同一組）
+
+/** 這件穿了就蓋到大腿（連身的洋裝類），不用再配下衣。 */
+export const coversHips = (spec) => !!spec && HIP_CATEGORIES.has(spec.category);
 const TUCKED_ORDER = ["leggings", "socks", "shoes", "innerTop", "top", "bottom", "overskirt", "accessory", "coat", "wrap"];
 const UNTUCKED_ORDER = ["leggings", "socks", "shoes", "innerTop", "bottom", "top", "overskirt", "accessory", "coat", "wrap"];
 
 /** 穿了罩裙、外套或罩衫卻沒穿上衣和內搭衣時配的白 T（沒有 T 恤模板的素體退回白襯衫模板）。 */
 const INNER_TEE = [{ category: "tee", color: "#f7f5ef" }, { category: "shirt", color: "#f7f5ef" }];
 
+/** 這件衣服交給播放器的染法：一般是目錄（或自己挑）的顏色；透膚的（漁網背心）布料透明、網線用那個顏色畫，自己挑的花紋不套、永遠是漁網。 */
+function garmentTint(spec) {
+  if (!spec.sheer) return spec.color;
+  const color = typeof spec.color === "string" ? spec.color : spec.color.color;
+  return { color, pattern: "fishnet", patternColor: color, sheer: true };
+}
+
 /** 一件衣服要交給播放器的套：專屬小人圖 → 同大類模板染主色；兩個都沒有就是 null。 */
 function garmentOutfit(who, spec) {
   const skeleton = who.skeletons.front;   // 模板三個視角都有，用正面判斷
   const template = `tpl_${spec.category}`;
-  const templateOutfit = skeleton.data.outfits?.[template] ? { name: template, tint: spec.color } : null;
+  const templateOutfit = skeleton.data.outfits?.[template] ? { name: template, tint: garmentTint(spec) } : null;
   const own = spec.sprites?.[who.name];
   if (!own || !Object.values(who.skeletons).some((view) => view.data.outfits?.[own])) return templateOutfit;
   // 手繪套可能只拆了部分視角：沒有的視角改穿 fallback（指定的舊套，沒指定就用同色模板）
   const fallback = spec.fallback?.[who.name] ?? templateOutfit;
-  return { name: own, tint: spec.dye ? spec.color : null, ...(fallback ? { fallback } : {}) };   // dye：手繪灰稿染成這件的顏色
+  return { name: own, tint: spec.dye || spec.sheer ? garmentTint(spec) : null, ...(fallback ? { fallback } : {}) };   // dye：手繪灰稿染成這件的顏色
 }
 
 /** 一件衣服另外接的零件（parts：無袖帽 T 接 T 恤的袖子），用那個大類的模板、只畫列出的骨頭，染同一個顏色。 */
 function partOutfits(who, spec) {
   return (spec.parts ?? []).filter(({ template }) => who.skeletons.front.data.outfits?.[`tpl_${template}`])
-    .map(({ template, bones }) => ({ name: `tpl_${template}`, tint: spec.color, ...(bones ? { bones } : {}) }));
+    .map(({ template, bones }) => ({ name: `tpl_${template}`, tint: garmentTint(spec), ...(bones ? { bones } : {}) }));
 }
 
 /** 能自己挑顏色的衣服：手繪灰稿（dye）或走同大類模板（沒有專屬圖）。 */
