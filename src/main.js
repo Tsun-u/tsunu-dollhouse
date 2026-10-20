@@ -6,7 +6,7 @@ import { loadSkeleton, samplePose } from "../vendor/player/player.js";
 import { BODIES, CLOTHES_COLORS, PATTERNS, dyeBase, dyePattern, headParts, randomDye, randomLooks, sameDye, withBase, withPattern, withPatternColor } from "../vendor/rules/looks.js";
 import { SHOP_LABEL, SHOP_RENT } from "../vendor/rules/state.js";
 import { CafeView } from "../vendor/web/cafe-view.js";
-import { CATEGORY_SLOT, SLOT_LABEL, dressUp, dyeable } from "../vendor/web/dress.js";
+import { CATEGORY_SLOT, SLOT_LABEL, coversHips, dressUp, dyeable } from "../vendor/web/dress.js";
 import { IconSheet } from "../vendor/web/icons.js";
 import { PuzzleView } from "../vendor/web/puzzle-view.js";
 import { StreetView } from "../vendor/web/street-view.js";
@@ -99,7 +99,7 @@ house.room.drawTableIcon = (ctx, item, x, y, size) => {   // 桌上的商品、�
 const puzzle = new PuzzleView($("board"), $("puzzleInfo"), $("puzzleStart"), icons, apply, content.settings.stamina, () => $("puzzleShop").value || undefined);
 const workshop = new WorkshopView({ materials: $("materials"), grid: $("grid"), products: $("products") }, content.recipes, icons, apply);
 const guests = Object.entries(BODIES).map(([body, spec]) => ({ body, views: { front: skeletons[spec.views.front], front34: skeletons[spec.views.front34], back34: skeletons[spec.views.back34] } }));
-const cafe = new CafeView($("cafeCanvas"), { skeleton: skeletons.front, guests, looks: { BODIES, CLOTHES_COLORS, headParts, randomLooks, randomDye }, clothes: content.clothes, dress: { dressUp, dyeable, CATEGORY_SLOT }, animations, samplePose }, icons, apply);
+const cafe = new CafeView($("cafeCanvas"), { skeleton: skeletons.front, guests, looks: { BODIES, CLOTHES_COLORS, headParts, randomLooks, randomDye }, clothes: content.clothes, dress: { dressUp, dyeable, CATEGORY_SLOT, coversHips }, animations, samplePose }, icons, apply);
 startCafeClock(game);
 
 // ───────── 商店街：咖啡廳加上租來的雜貨店、服飾店（跟小屋一樣），每家店可以換裝潢 ─────────

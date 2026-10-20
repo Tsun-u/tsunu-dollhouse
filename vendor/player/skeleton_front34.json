@@ -640,6 +640,14 @@
    "upper_leg_l:clip": [
     "front34_tpl_pajama_pants_thigh_patch.png"
    ]
+  },
+  "tpl_pumpkin_suit": {
+   "torso": [
+    "front34_tpl_pumpkin_suit_torso.png"
+   ],
+   "hem": [
+    "front34_tpl_pumpkin_suit_hem.png"
+   ]
   }
  },
  "skinGray": true,
@@ -672,6 +680,9 @@
    "torso": "foot_l"
   },
   "tpl_pajama_top": {
+   "torso": "foot_l"
+  },
+  "tpl_pumpkin_suit": {
    "torso": "foot_l"
   }
  }

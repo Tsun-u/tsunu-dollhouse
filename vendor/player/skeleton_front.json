@@ -629,6 +629,14 @@
    "lower_leg_r": [
     "front_tpl_pajama_pants_lower_leg_r.png"
    ]
+  },
+  "tpl_pumpkin_suit": {
+   "torso": [
+    "front_tpl_pumpkin_suit_torso.png"
+   ],
+   "hem": [
+    "front_tpl_pumpkin_suit_hem.png"
+   ]
   }
  },
  "outfitAfter": {
@@ -646,6 +654,9 @@
   },
   "tpl_coat": {
    "torso": "foot_r"
+  },
+  "tpl_pumpkin_suit": {
+   "torso": "upper_leg_r"
   }
  },
  "skinGray": true,

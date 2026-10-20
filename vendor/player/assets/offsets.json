@@ -455,6 +455,14 @@
 381,
 400
 ],
+"front34_tpl_pumpkin_suit_hem.png": [
+326,
+607
+],
+"front34_tpl_pumpkin_suit_torso.png": [
+370,
+406
+],
 "front34_tpl_shirt_collar.png": [
 435,
 390
@@ -959,6 +967,14 @@
 405,
 399
 ],
+"front_tpl_pumpkin_suit_hem.png": [
+337,
+610
+],
+"front_tpl_pumpkin_suit_torso.png": [
+398,
+409
+],
 "front_tpl_shirt_torso.png": [
 408,
 385
@@ -1310,6 +1326,14 @@
 "m_back34_tpl_pants_upper_leg_r.png": [
 487,
 741
+],
+"m_back34_tpl_pumpkin_suit_hem.png": [
+314,
+617
+],
+"m_back34_tpl_pumpkin_suit_torso.png": [
+364,
+393
 ],
 "m_back34_tpl_shirt_armhole.png": [
 0,
@@ -1763,6 +1787,14 @@
 397,
 657
 ],
+"m_front34_tpl_pumpkin_suit_hem.png": [
+348,
+618
+],
+"m_front34_tpl_pumpkin_suit_torso.png": [
+393,
+395
+],
 "m_front34_tpl_shirt_armhole.png": [
 417,
 412
@@ -2211,6 +2243,14 @@
 393,
 748
 ],
+"m_front_tpl_pumpkin_suit_hem.png": [
+321,
+642
+],
+"m_front_tpl_pumpkin_suit_torso.png": [
+354,
+391
+],
 "m_front_tpl_shirt_armhole.png": [
 0,
 0
@@ -2462,6 +2502,14 @@
 "tpl_pinafore_torso.png": [
 389,
 403
+],
+"tpl_pumpkin_suit_hem.png": [
+340,
+605
+],
+"tpl_pumpkin_suit_torso.png": [
+364,
+408
 ],
 "tpl_shirt_armhole.png": [
 0,

@@ -400,6 +400,14 @@
    "lower_leg_l": [
     "m_back34_tpl_pajama_pants_lower_leg_l.png"
    ]
+  },
+  "tpl_pumpkin_suit": {
+   "torso": [
+    "m_back34_tpl_pumpkin_suit_torso.png"
+   ],
+   "hem": [
+    "m_back34_tpl_pumpkin_suit_hem.png"
+   ]
   }
  },
  "scale": 1.05,
@@ -422,6 +430,9 @@
    "torso": "foot_l"
   },
   "tpl_pajama_top": {
+   "torso": "foot_l"
+  },
+  "tpl_pumpkin_suit": {
    "torso": "foot_l"
   }
  }

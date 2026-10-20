@@ -565,6 +565,14 @@
    "lower_leg_r": [
     "m_front_tpl_pajama_pants_lower_leg_r.png"
    ]
+  },
+  "tpl_pumpkin_suit": {
+   "torso": [
+    "m_front_tpl_pumpkin_suit_torso.png"
+   ],
+   "hem": [
+    "m_front_tpl_pumpkin_suit_hem.png"
+   ]
   }
  },
  "scale": 1.05,
@@ -579,6 +587,9 @@
   },
   "tpl_tie": {
    "torso": "hand_r"
+  },
+  "tpl_pumpkin_suit": {
+   "torso": "upper_leg_r"
   }
  }
 }

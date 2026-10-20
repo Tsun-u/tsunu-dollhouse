@@ -38,6 +38,12 @@
    "atone"
   ]
  },
+ "pumpkin_suit": {
+  "label": "南瓜小丑裝",
+  "category": "pumpkin_suit",
+  "color": "#e58a2e",
+  "price": 150
+ },
  "coat_camel": {
   "label": "外套",
   "category": "coat",
