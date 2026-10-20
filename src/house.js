@@ -346,10 +346,11 @@ export class House {
     const catalog = this.deps.content.furniture;
     const seatOf = (d) => seatAt(this.room.home, d.spot, catalog);
     const asleep = (d) => d.asleep || (!!this.sleepingOn && seatOf(d)?.id === this.sleepingOn);
+    const standing = (d) => !seatOf(d) && !asleep(d);
     const actions = [button("揮手", () => this.wave(doll.id))];
     for (const other of others) {
       const washing = this.washing(doll) || this.washing(other);
-      if (!washing) actions.push(button(`抱抱${other.name}`, () => this.hug(doll, other)));
+      if (!washing && standing(doll) && standing(other)) actions.push(button(`抱抱${other.name}`, () => this.hug(doll, other)));   // 抱抱只在兩個都站著時：停在朋友、家人的距離
       if (!asleep(doll) && !asleep(other)) actions.push(button(`用枕頭丟${other.name}`, () => this.act({ kind: "throw_pillow", target: other.name })));
       const seat = seatOf(other);
       const together = seat && seatOf(doll)?.id === seat.id;
@@ -386,16 +387,11 @@ export class House {
     who.waveTimer = setTimeout(() => { if (who.anim === "wave") who.anim = "idle"; }, WAVE_MS);
   }
 
-  /** 抱抱（面對面）：兩個人坐在同一件家具上就原地抱，不然走到對方前面一格再抱。 */
+  /** 抱抱（面對面、兩個都站著）：走到對方前面一格再抱。 */
   hug(doll, other) {
-    const catalog = this.deps.content.furniture;
-    const seat = seatAt(this.room.home, other.spot, catalog);
-    const sameSeat = seat && seatAt(this.room.home, doll.spot, catalog)?.id === seat.id;
-    if (!sameSeat) {
-      const cell = cuddleSpot(this.room.home, other.spot, false, catalog);
-      if (!cell || !this.standable(cell, doll.id)) return;
-      this.moveDoll(doll.id, { room: this.roomId, x: cell.x, y: cell.y });
-    }
+    const cell = cuddleSpot(this.room.home, other.spot, false, this.deps.content.furniture);
+    if (!cell || !this.standable(cell, doll.id)) return;
+    this.moveDoll(doll.id, { room: this.roomId, x: cell.x, y: cell.y });
     this.room.cuddle(this.people.get(doll.id), this.people.get(other.id), { behind: false, kiss: false });
   }
 
