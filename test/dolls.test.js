@@ -71,11 +71,22 @@ test("存檔帶版本號，讀回來一樣；沒有存檔就是空的", () => {
   assert.deepEqual(loadDolls(storage), { dolls: [], selected: null });
   const dolls = [doll()];
   saveDolls(storage, { dolls, selected: dolls[0].id });
-  assert.equal(JSON.parse(map.get(DOLLS_KEY)).version, 6);
+  assert.equal(JSON.parse(map.get(DOLLS_KEY)).version, 7);
   assert.deepEqual(loadDolls(storage), { dolls, selected: dolls[0].id });
 });
 
 test("新娃娃的預設嘴巴：那個素體的第一款", () => {
   assert.equal(doll().mouth, "kid_f_smile");
   assert.equal(doll({ body: "m" }).mouth, "kid_m_smile");
+});
+
+test("版本 6 的娃娃存檔：穿在上衣格的南瓜小丑裝搬到罩裙格，其他格不動", () => {
+  const map = new Map([[DOLLS_KEY, JSON.stringify({ version: 6, dolls: [
+    { id: "a", name: "甲", body: "f", worn: { top: "pumpkin_suit", bottom: "jeans_shorts", shoes: "shoes_gray" } },
+    { id: "b", name: "乙", body: "f", worn: { top: "tee_gray", bottom: "jeans_shorts" } },
+  ], selected: "a" })]]);
+  const storage = { getItem: (k) => map.get(k) ?? null, setItem: (k, v) => map.set(k, v) };
+  const { dolls } = loadDolls(storage);
+  assert.deepEqual(dolls[0].worn, { bottom: "jeans_shorts", shoes: "shoes_gray", overskirt: "pumpkin_suit" });
+  assert.deepEqual(dolls[1].worn, { top: "tee_gray", bottom: "jeans_shorts" });
 });

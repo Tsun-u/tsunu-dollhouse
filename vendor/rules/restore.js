@@ -8,8 +8,27 @@ export function restore(snapshot, content) {
     const loaded = snapshot;
     if (loaded.version !== 1)
         throw new Error(`不認得的存檔版本：${String(loaded.version)}`);
-    return { ...createInitialState(), ...migrateWorn(splitOutfits(mergeColorVariants(splitClothesColors(migrateShops(migrateUpstairs(migrateRooms(loaded), content)))), content), content), puzzle: migratePuzzle(loaded.puzzle) };
+    return { ...createInitialState(), ...migratePumpkinSuit(migrateWorn(splitOutfits(mergeColorVariants(splitClothesColors(migrateShops(migrateUpstairs(migrateRooms(loaded), content)))), content), content)), puzzle: migratePuzzle(loaded.puzzle) };
 }
+/** 南瓜小丑裝從上衣格搬到罩裙格（它是套在衣服外面的）：屋主、客人檔案、屋裡的客人身上穿的都搬。 */
+function migratePumpkinSuit(loaded) {
+    const moveWorn = (worn) => {
+        if (worn.top !== PUMPKIN_SUIT)
+            return worn;
+        const { top: _top, ...rest } = worn;
+        return { ...rest, overskirt: PUMPKIN_SUIT };
+    };
+    const moveAll = (record) => Object.fromEntries(Object.entries(record).map(([id, who]) => [id, { ...who, worn: moveWorn(who.worn) }]));
+    const out = { ...loaded };
+    if (loaded.worn)
+        out.worn = { atone: moveWorn(loaded.worn.atone), tsunu: moveWorn(loaded.worn.tsunu) };
+    if (loaded.visitorProfiles)
+        out.visitorProfiles = moveAll(loaded.visitorProfiles);
+    if (loaded.visitors)
+        out.visitors = moveAll(loaded.visitors);
+    return out;
+}
+const PUMPKIN_SUIT = "pumpkin_suit";
 /** 客房的門搬上樓：有客房、沒有二樓小客廳的存檔，補一間二樓（門接客廳），每間客房的門從原本那間搬到二樓。 */
 function migrateUpstairs(loaded, content) {
     const rooms = loaded.rooms;

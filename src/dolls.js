@@ -6,7 +6,7 @@ import { MERGED_CLOTHES, SPLIT_CLOTHES } from "../vendor/rules/restore.js";
 
 export const DOLLS_KEY = "dollhouse.dolls";
 export const MAX_DOLLS = 4;
-const VERSION = 6;
+const VERSION = 7;
 const START_SPOT = { room: "bedroom", x: 3, y: 4 };
 
 export function createDoll({ name, body, ...looks }, newId = () => crypto.randomUUID()) {
@@ -91,6 +91,15 @@ const MIGRATIONS = {
   4: splitSuits(5),   // 4 → 5：一件式制服 → 襯衫＋百褶裙＋蝴蝶結
   /** 5 → 6：舊的捲髮鮑伯頭跟捲捲短髮是同一個造型，併進捲捲短髮（「鮑伯頭」改指直髮的經典鮑伯）。 */
   5: (saved) => ({ ...saved, version: 6, dolls: saved.dolls.map((doll) => (doll.hair === "kid_bob" ? { ...doll, hair: "curly_short" } : doll)) }),
+  /** 6 → 7：南瓜小丑裝是套在衣服外面的，從上衣格搬到罩裙格（跟小屋的 migratePumpkinSuit 一樣）。 */
+  6: (saved) => ({
+    ...saved, version: 7,
+    dolls: saved.dolls.map((doll) => {
+      if (doll.worn.top !== "pumpkin_suit") return doll;
+      const { top: _top, ...rest } = doll.worn;
+      return { ...doll, worn: { ...rest, overskirt: "pumpkin_suit" } };
+    }),
+  }),
 };
 
 export function loadDolls(storage, clothes = {}) {
