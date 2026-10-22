@@ -109,6 +109,7 @@ const street = new StreetView($("streetCanvas"), {
   onPick: (kind) => { viewingShop = kind; cafe.setShop(kind); $("rentPanel").hidden = true; decorSpot = null; renderCafe(); },
   onRent: (lot) => openRent(lot),
   onHome: () => showTab("home"),
+  inn: false,   // 兒童版的街上沒有旅館
 });
 $("cafeToggle").onclick = () => apply({ kind: "shop_open", open: !game.state.shops[viewingShop].open, shop: viewingShop });
 

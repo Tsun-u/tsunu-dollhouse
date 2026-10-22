@@ -2,7 +2,9 @@
 // 頭上冒出想要的商品；點客人就出餐。客人的長相由外觀種子（customer.look）決定：男生或女生素體、長相、穿著與顏色都隨機。
 
 const W = 900, H = 360, FLOOR_Y = 320, COUNTER = { x: 110, w: 170, h: 90 }, DOOR_X = 820;
-const QUEUE_X = [330, 420, 505];   // 排隊位置在櫃台與桌組之間
+const QUEUE_X = [330, 420, 505];   // 排隊位置在櫃台與桌組之間（NPC 最多三位；真客人不受上限，排到後面往門口接）
+const queueX = (index) => QUEUE_X[index] ?? QUEUE_X.at(-1) + 70 * (index - QUEUE_X.length + 1);
+const STAND_X = [690, 630, 760, 570];   // 進店還沒點單的真客人站在門邊
 const WALK_SPEED = 220;   // 畫布像素／秒
 const GUEST_FACING = { front34: 1, back34: -1 };   // 斜前面向左邊的櫃台、斜後面向右邊的門
 const EXTRA_LAYERS = { overskirt: 0.2, coat: 0.25, accessory: 0.2 };   // 客人加穿罩裙、外套、飾品的機率
@@ -35,6 +37,8 @@ export class CafeView {
     this.dress = dress;
     this.wardrobes = guests.map(({ body, views }) => guestWardrobe(body, looks.BODIES[body].sprites, views));
     this.customers = new Map();   // id → { data, x, target, leaving, look }
+    this.standing = new Map();    // 進店還沒點單的真客人：id → { x, target, leaving, look }
+    this.guests = null;           // 這家店裡的真客人 [{ id, look, label }]（小屋餵；兒童版沒有）
     this.state = null;
     this.ratio = 1;
     this.shopKind = "cafe";   // 畫面上是哪家店
@@ -76,29 +80,47 @@ export class CafeView {
     if (kind === this.shopKind) return;
     this.shopKind = kind;
     this.customers.clear();
-    if (this.state) this.setState(this.state);
+    this.standing.clear();
+    if (this.state) this.setState(this.state, this.guests);
   }
 
-  setState(state) {
+  /** guests：這家店裡的真客人 [{ id, look: { views, skin, outfits, bodyTint }, label }]；排隊的照隊伍站、沒點單的站門邊。沒給就只有 NPC。 */
+  setState(state, guests = this.guests) {
     this.state = state;
+    this.guests = guests;
+    const guestLook = (id) => guests?.find((guest) => guest.id === id)?.look;
     const seen = new Set();
     this.shop.customers.forEach((data, index) => {
       seen.add(data.id);
       const existing = this.customers.get(data.id);
-      if (existing) { existing.data = data; existing.target = QUEUE_X[index]; return; }
-      const customer = { data, x: DOOR_X + 60, target: QUEUE_X[index], leaving: false, look: this.dressGuest(data.look), ready: false };
+      if (existing) { existing.data = data; existing.target = queueX(index); return; }
+      const stood = this.standing.get(data.id);   // 站著的真客人點單了：從原地走去排隊
+      const look = (data.visitor && guestLook(data.id)) ?? this.dressGuest(data.look);
+      const customer = { data, x: stood?.x ?? DOOR_X + 60, target: queueX(index), leaving: false, look, ready: false };
       Promise.all(Object.values(customer.look.views).map((skeleton) => skeleton.partsSettled())).then(() => { customer.ready = true; });   // 衣服、五官的圖載完才進門，不會先露出素體
       this.customers.set(data.id, customer);
+      this.standing.delete(data.id);
     });
     for (const [id, customer] of this.customers) if (!seen.has(id) && !customer.leaving) { customer.leaving = true; customer.target = DOOR_X + 80; }
+    const standingNow = (guests ?? []).filter((guest) => !seen.has(guest.id));
+    standingNow.forEach((guest, index) => {
+      const existing = this.standing.get(guest.id);
+      if (existing) { existing.look = guest.look; existing.target = STAND_X[index % STAND_X.length]; existing.leaving = false; return; }
+      const person = { x: DOOR_X + 60, target: STAND_X[index % STAND_X.length], leaving: false, look: guest.look, ready: false };
+      Promise.all(Object.values(person.look.views).map((skeleton) => skeleton.partsSettled())).then(() => { person.ready = true; });
+      this.standing.set(guest.id, person);
+    });
+    for (const [id, person] of this.standing) if (!standingNow.some((guest) => guest.id === id) && !person.leaving) { person.leaving = true; person.target = DOOR_X + 80; }
   }
 
   step(dt) {
-    for (const [id, customer] of this.customers) {
-      if (!customer.ready) continue;
-      const dx = customer.target - customer.x;
-      if (Math.abs(dx) <= WALK_SPEED * dt) { customer.x = customer.target; if (customer.leaving) this.customers.delete(id); }
-      else customer.x += Math.sign(dx) * WALK_SPEED * dt;
+    for (const group of [this.customers, this.standing]) {
+      for (const [id, person] of group) {
+        if (!person.ready) continue;
+        const dx = person.target - person.x;
+        if (Math.abs(dx) <= WALK_SPEED * dt) { person.x = person.target; if (person.leaving) group.delete(id); }
+        else person.x += Math.sign(dx) * WALK_SPEED * dt;
+      }
     }
   }
 
@@ -240,12 +262,18 @@ export class CafeView {
     this.drawPerson(COUNTER.x + COUNTER.w / 2, time, this.owner);
     if (!this.drawDecor("counter")) this.drawCounter();
     if (this.state && !this.shop.open) { ctx.fillStyle = "rgba(60,40,30,0.55)"; ctx.fillRect(0, 0, W, H); ctx.fillStyle = "#fff"; ctx.font = "24px sans-serif"; ctx.fillText("打烊中", W / 2, H / 2); this.drawBrushes(); return; }
-    // 客人
+    // 客人：排隊的（NPC 與點了單的真客人）與站在門邊還沒點單的真客人
     for (const customer of this.customers.values()) {
       if (!customer.ready) continue;
       const walking = customer.x !== customer.target;
       this.drawPerson(customer.x, time + (customer.data.look % 97), { ...customer.look, ...this.guestTurn(customer), anim: walking ? "walk" : "idle" });   // 錯開每個人的動畫相位
       if (!customer.leaving) this.drawBubble(customer, time);
+    }
+    let phase = 0;
+    for (const person of this.standing.values()) {
+      if (!person.ready) continue;
+      const walking = person.x !== person.target;
+      this.drawPerson(person.x, time + (phase += 13), { ...person.look, ...this.guestTurn(person), anim: walking ? "walk" : "idle" });
     }
     this.drawBrushes();
   }
@@ -268,6 +296,7 @@ export class CafeView {
     ctx.beginPath(); ctx.moveTo(x - 8, y + 26); ctx.lineTo(x, y + 36); ctx.lineTo(x + 8, y + 26); ctx.closePath(); ctx.fill();
     const recipe = this.icons.recipes[customer.data.wants];
     this.icons.drawIcon(ctx, customer.data.wants, (recipe?.tiers.length ?? 1) - 1, x - 20, y - 24, 40);
+    if (customer.data.visitor) return;   // 真客人不會等太久就走，不畫耐心條
     const waited = Date.now() - new Date(customer.data.arrivedAt).getTime();
     const left = Math.max(0, 1 - waited / PATIENCE_MS);
     ctx.fillStyle = "#e0d3bf"; ctx.fillRect(x - 24, y + 18, 48, 5);

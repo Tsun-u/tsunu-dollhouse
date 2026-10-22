@@ -15,11 +15,12 @@ export function shopTick(state, content, now, rand, newId) {
         let servedNow = false;
         for (const customer of shop.customers) {
             const waited = now.getTime() - new Date(customer.arrivedAt).getTime();
-            if (waited > CUSTOMER_PATIENCE_MS) {
+            const handsFull = customer.visitor && !!state.visitors?.[customer.id]?.holding; // 真客人手上有東西：先不出餐，等他放下
+            if (waited > CUSTOMER_PATIENCE_MS && !customer.visitor) { // 真客人不會等太久就走，自己決定什麼時候離開
                 actions.push({ kind: "customer_leave", id: customer.id });
                 waiting--;
             }
-            else if (waited > AUTO_SERVE_MS && (stock[customer.wants] ?? 0) > 0) {
+            else if (waited > AUTO_SERVE_MS && !handsFull && (stock[customer.wants] ?? 0) > 0) {
                 actions.push({ kind: "serve", customer: customer.id });
                 stock[customer.wants] -= 1;
                 waiting--;

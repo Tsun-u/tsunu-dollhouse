@@ -3,5 +3,13 @@
   "enabled": true,
   "max": 5,
   "regenMinutes": 20
+ },
+ "guestMoney": {
+  "welcome": 300,
+  "visit": 50,
+  "chore": 20
+ },
+ "inn": {
+  "fee": 60
  }
 }
