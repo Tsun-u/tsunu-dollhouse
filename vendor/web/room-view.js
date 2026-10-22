@@ -1184,8 +1184,9 @@ export class RoomView {
       if (!piece.on) continue;
       const [sx, sy] = this.toScreen(piece.x + 0.5, piece.y + 0.5);
       const radius = this.catalog[piece.item]?.glow ?? 110;   // 小夜燈這類小燈的目錄寫 glow 縮小光圈
+      const tint = this.catalog[piece.item]?.glowColor ?? "255, 214, 140";   // 南瓜燈的目錄寫 glowColor 換成橘光（"r, g, b"）
       const glow = ctx.createRadialGradient(sx, sy, 8, sx, sy, radius);
-      glow.addColorStop(0, "rgba(255, 214, 140, 0.55)"); glow.addColorStop(1, "rgba(255, 214, 140, 0)");
+      glow.addColorStop(0, `rgba(${tint}, 0.55)`); glow.addColorStop(1, `rgba(${tint}, 0)`);
       ctx.save(); ctx.translate(sx, sy); ctx.scale(1, 0.5); ctx.translate(-sx, -sy);
       ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(sx, sy, radius, 0, Math.PI * 2); ctx.fill();
       ctx.restore();

@@ -594,5 +594,53 @@
    "y": 747,
    "width": 429
   }
+ },
+ "jack_o_lantern": {
+  "label": "南瓜燈",
+  "size": 0.75,
+  "w": 1,
+  "d": 1,
+  "height": 0.5,
+  "color": "#e8862a",
+  "price": 120,
+  "image": "assets/furniture/jack_o_lantern.png",
+  "anchor": {
+   "x": 511,
+   "y": 715,
+   "width": 262
+  },
+  "switch": true,
+  "glow": 90,
+  "glowColor": "255, 150, 60"
+ },
+ "bunting": {
+  "label": "萬聖節三角旗",
+  "w": 4,
+  "d": 1,
+  "height": 1.0,
+  "color": "#8a5cc4",
+  "price": 100,
+  "image": "assets/furniture/bunting.png",
+  "anchor": {
+   "x": 219,
+   "y": 617,
+   "width": 587
+  },
+  "onWall": true
+ },
+ "spider_web": {
+  "label": "蜘蛛網",
+  "w": 1,
+  "d": 1,
+  "height": 1.0,
+  "color": "#cfcac0",
+  "price": 60,
+  "image": "assets/furniture/spider_web.png",
+  "anchor": {
+   "x": 257,
+   "y": 699,
+   "width": 128
+  },
+  "onWall": true
  }
 }
