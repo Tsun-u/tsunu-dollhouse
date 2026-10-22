@@ -131,6 +131,8 @@
  },
  "nightstand": {
   "label": "床頭櫃",
+  "table": true,
+  "drawer": true,
   "w": 1,
   "d": 1,
   "height": 0.7,
@@ -559,5 +561,38 @@
    "width": 384
   },
   "onWall": true
+ },
+ "night_light": {
+  "label": "小夜燈",
+  "size": 0.75,
+  "w": 1,
+  "d": 1,
+  "height": 0.6,
+  "color": "#f2dc8c",
+  "price": 80,
+  "image": "assets/furniture/night_light.png",
+  "anchor": {
+   "x": 512,
+   "y": 751,
+   "width": 260
+  },
+  "switch": true,
+  "glow": 70
+ },
+ "gummy_bear": {
+  "label": "大小熊軟糖",
+  "size": 0.85,
+  "dye": true,
+  "w": 1,
+  "d": 1,
+  "height": 1.0,
+  "color": "#e03a2f",
+  "price": 180,
+  "image": "assets/furniture/gummy_bear.png",
+  "anchor": {
+   "x": 511,
+   "y": 747,
+   "width": 429
+  }
  }
 }

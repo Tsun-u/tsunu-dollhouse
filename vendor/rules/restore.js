@@ -1,6 +1,6 @@
 // 讀進來的存檔升級成目前的格式：沒有存檔就從頭開始，舊格式照順序遷移。純邏輯，小屋與兒童版共用。
 import { CATEGORY_SLOT } from "./clothing.js";
-import { FIRST_ROOM, createBedroom, createInitialState } from "./state.js";
+import { FIRST_ROOM, GUEST_LOUNGE_ROOM, createBedroom, createInitialState, freeDoorSpot } from "./state.js";
 const JEANS_SHORTS = "jeans_shorts";
 export function restore(snapshot, content) {
     if (!snapshot || typeof snapshot !== "object")
@@ -8,7 +8,35 @@ export function restore(snapshot, content) {
     const loaded = snapshot;
     if (loaded.version !== 1)
         throw new Error(`不認得的存檔版本：${String(loaded.version)}`);
-    return { ...createInitialState(), ...migrateWorn(splitOutfits(mergeColorVariants(splitClothesColors(migrateShops(migrateRooms(loaded)))), content), content), puzzle: migratePuzzle(loaded.puzzle) };
+    return { ...createInitialState(), ...migrateWorn(splitOutfits(mergeColorVariants(splitClothesColors(migrateShops(migrateUpstairs(migrateRooms(loaded), content)))), content), content), puzzle: migratePuzzle(loaded.puzzle) };
+}
+/** 客房的門搬上樓：有客房、沒有二樓小客廳的存檔，補一間二樓（門接客廳），每間客房的門從原本那間搬到二樓。 */
+function migrateUpstairs(loaded, content) {
+    const rooms = loaded.rooms;
+    if (!rooms || rooms[GUEST_LOUNGE_ROOM])
+        return loaded;
+    const guestIds = Object.keys(rooms).filter((id) => content.rooms[rooms[id].kind]?.guest);
+    if (!guestIds.length)
+        return loaded;
+    const spec = content.rooms[GUEST_LOUNGE_ROOM];
+    const parentId = spec.connectsTo && rooms[spec.connectsTo] ? spec.connectsTo : FIRST_ROOM;
+    const next = { ...rooms };
+    for (const id of guestIds)
+        next[id] = { ...next[id], doors: [{ wall: "left", at: Math.floor(next[id].depth / 2), to: GUEST_LOUNGE_ROOM }] };
+    for (const [id, room] of Object.entries(next))
+        if (!guestIds.includes(id))
+            next[id] = { ...room, doors: room.doors.filter((door) => !guestIds.includes(door.to)) };
+    let lounge = { kind: GUEST_LOUNGE_ROOM, name: spec.label, width: spec.width, depth: spec.depth, placed: [], doors: [{ wall: "left", at: Math.floor(spec.depth / 2), to: parentId }] };
+    for (const id of guestIds) {
+        const at = freeDoorSpot(lounge, content.furniture);
+        if (at)
+            lounge = { ...lounge, doors: [...lounge.doors, { ...at, to: id }] };
+    }
+    const parent = next[parentId];
+    const stairs = freeDoorSpot(parent, content.furniture);
+    next[parentId] = { ...parent, doors: [...parent.doors, { ...(stairs ?? { wall: "left", at: 1 }), to: GUEST_LOUNGE_ROOM }] };
+    next[GUEST_LOUNGE_ROOM] = lounge;
+    return { ...loaded, rooms: next };
 }
 /** 舊存檔的衣服顏色兩人共用一份（衣服代號 → 染法）：複製給兩人各一份，外觀不變。
  *  一律寫回：舊存檔沒有這欄時兩人都沒染過，不能讓新遊戲的起始顏色蓋上去。 */

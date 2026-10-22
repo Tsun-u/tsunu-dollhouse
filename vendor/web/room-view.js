@@ -1099,7 +1099,7 @@ export class RoomView {
   /** 桌上有東西：一樣一樣排在桌面上。頁面有給 drawTableIcon（畫得出來回 true）就畫縮圖，其餘畫小圓點。 */
   drawTableItems(piece) {
     const items = piece.items ?? [];
-    if (!items.length) return;
+    if (!items.length || this.catalog[piece.item]?.drawer) return;   // 抽屜裡的東西藏著不畫
     const { ctx } = this;
     const { w, d } = this.footprint(piece);
     const [sx, sy] = this.toScreen(piece.x + w / 2, piece.y + d / 2);
@@ -1183,10 +1183,11 @@ export class RoomView {
     for (const piece of this.home.placed) {
       if (!piece.on) continue;
       const [sx, sy] = this.toScreen(piece.x + 0.5, piece.y + 0.5);
-      const glow = ctx.createRadialGradient(sx, sy, 8, sx, sy, 110);
+      const radius = this.catalog[piece.item]?.glow ?? 110;   // 小夜燈這類小燈的目錄寫 glow 縮小光圈
+      const glow = ctx.createRadialGradient(sx, sy, 8, sx, sy, radius);
       glow.addColorStop(0, "rgba(255, 214, 140, 0.55)"); glow.addColorStop(1, "rgba(255, 214, 140, 0)");
       ctx.save(); ctx.translate(sx, sy); ctx.scale(1, 0.5); ctx.translate(-sx, -sy);
-      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(sx, sy, 110, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(sx, sy, radius, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
   }

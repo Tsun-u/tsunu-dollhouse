@@ -320,7 +320,7 @@ export class House {
       if (spec?.bowl) actions.push(button(`倒飼料給${pet.label}`, () => this.act({ kind: "feed", dog, food: "meal" }), ""));
       if (spec?.snacks) actions.push(button(`拿零食給${pet.label}`, () => this.act({ kind: "feed", dog, food: "snack" }), ""));
     }
-    if (spec?.table) actions.push(button("打開桌面", () => { this.tableOpen = piece.id; this.renderTable(); }, ""));
+    if (spec?.table) actions.push(button(spec.drawer ? "打開抽屜" : "打開桌面", () => { this.tableOpen = piece.id; this.renderTable(); }, ""));
     if (spec?.dye) actions.push(button(this.paintingId === piece.id ? "收起顏色" : "換顏色", () => { this.paintingId = this.paintingId === piece.id ? null : piece.id; this.renderPieceActions(); }, ""));
     $("pieceActions").replaceChildren(...actions);
     const painting = spec?.dye && this.paintingId === piece.id;   // 布面色盤：原色＋衣服的色票＋自訂顏色
@@ -434,7 +434,7 @@ export class House {
     });
   }
 
-  /** 桌上的東西（點了拿走，家常菜是吃掉；寫是哪個娃娃放的）與可以放上去的商品、家常菜；一張桌子最多 3 樣。 */
+  /** 桌上（抽屜裡）的東西（點了拿走，家常菜是吃掉；寫是哪個娃娃放的）與可以放上去的商品、家常菜；一張桌子最多 3 樣。 */
   renderTable() {
     const piece = this.tableOpen && this.room.home?.placed.find((p) => p.id === this.tableOpen);
     $("tablePanel").hidden = !piece;
@@ -442,7 +442,9 @@ export class House {
     const { content, game } = this.deps;
     const icons = this.deps.icons();
     const items = piece.items ?? [];
-    $("tableTitle").textContent = `${content.furniture[piece.item].label}上（${items.length}/3）`;
+    const spec = content.furniture[piece.item];
+    const where = spec.drawer ? { title: `${spec.label}的抽屜`, empty: "抽屜空空的。", put: "放進抽屜" } : { title: `${spec.label}上`, empty: "桌上空空的。", put: "上桌" };
+    $("tableTitle").textContent = `${where.title}（${items.length}/3）`;
     const productIcon = (chain) => { const icon = Object.assign(document.createElement("span"), { className: "icon" }); icons.apply(icon, chain, (content.recipes[chain]?.tiers.length ?? 1) - 1); return icon; };
     const dishIcon = (dish) => Object.assign(document.createElement("img"), { className: "icon", src: content.dishes[dish]?.image ?? "", alt: "" });
     $("tableItems").replaceChildren(...items.map((item, index) => {
@@ -454,7 +456,7 @@ export class House {
       chip.title = "點一下拿走";
       return chip;
     }));
-    if (!items.length) $("tableItems").textContent = "桌上空空的。";
+    if (!items.length) $("tableItems").textContent = where.empty;
     const count = (n) => Object.assign(document.createElement("span"), { className: "count", textContent: `×${n}` });
     const put = (children, action) => {
       const chip = button("", () => this.act(action));
@@ -463,8 +465,8 @@ export class House {
       return chip;
     };
     $("tablePut").replaceChildren(
-      ...Object.entries(game.state.products).map(([chain, n]) => put([productIcon(chain), `放一份${content.recipes[chain]?.tiers.at(-1) ?? chain}`, count(n)], { kind: "put_on_table", id: piece.id, product: chain })),
-      ...Object.entries(game.state.dishes ?? {}).filter(([, n]) => n > 0).map(([dish, n]) => put([dishIcon(dish), `端一份${content.dishes[dish]?.label ?? dish}上桌`, count(n)], { kind: "put_on_table", id: piece.id, dish })),
+      ...Object.entries(game.state.products).map(([chain, n]) => put([productIcon(chain), `放一份${content.recipes[chain]?.tiers.at(-1) ?? chain}${spec.drawer ? "進抽屜" : ""}`, count(n)], { kind: "put_on_table", id: piece.id, product: chain })),
+      ...Object.entries(game.state.dishes ?? {}).filter(([, n]) => n > 0).map(([dish, n]) => put([dishIcon(dish), `端一份${content.dishes[dish]?.label ?? dish}${where.put}`, count(n)], { kind: "put_on_table", id: piece.id, dish })),
     );
   }
 

@@ -54,6 +54,7 @@ export const ORDER_WEIGHT = 2; // 客人點的商品，它的材料在盤面裡�
 export const DOOR = { x: 7, y: 7 };
 export const ACTOR_NAME = { atone: "阿童", tsunu: "阿宇" };
 export const FIRST_ROOM = "bedroom";
+export const GUEST_LOUNGE_ROOM = "upstairs"; // 客房的玄關：客房的門都開在這間，客房登記板也在這裡
 const HOME_SPOTS = { atone: { room: FIRST_ROOM, x: 6, y: 2 }, tsunu: { room: FIRST_ROOM, x: 2, y: 6 } };
 const RECONNECT_GRACE_MS = 10 * 60_000; // 出門不到這麼久就回來，是斷線重連（小屋重開、網路閃斷）：留在原地，不從大門重新走進來
 export const STARTER_INVENTORY = { sofa: 1, table: 1, bed: 1, bookshelf: 1, plant: 2, lamp: 1, rug: 1, dogbed: 2 };
@@ -201,12 +202,14 @@ function reduce(state, action, context) {
         }
         case "move": {
             const { piece, roomId } = findPlaced(state, action.id);
+            assertOwnedBy(state, piece, null);
             const moved = { ...piece, x: action.x, y: action.y };
             assertFits(findRoom(state, roomId), moved, furniture, piece.id);
             return { state: replacePlaced(state, moved), note: `把${label(piece.item)}搬到 (${action.x}, ${action.y})` };
         }
         case "flip": {
             const { piece, roomId } = findPlaced(state, action.id);
+            assertOwnedBy(state, piece, null);
             // 牆上家具換到另一面牆的同一格；有背面圖的家具輪四個方向：朝右下 → 左下 → 左上 → 右上，每轉兩次換一次正反面
             const spec = furniture[piece.item];
             const flipped = spec?.onWall ? { ...piece, flip: !piece.flip, x: piece.y, y: piece.x }
@@ -216,6 +219,7 @@ function reduce(state, action, context) {
         }
         case "store": {
             const { piece, roomId } = findPlaced(state, action.id);
+            assertOwnedBy(state, piece, null);
             const room = findRoom(state, roomId);
             return {
                 state: { ...withRoom(state, roomId, { ...room, placed: room.placed.filter((p) => p.id !== piece.id) }), inventory: adjust(state.inventory, piece.item, 1) },
@@ -387,6 +391,23 @@ function reduce(state, action, context) {
                 throw new Error(`錢不夠（有 ${state.money}）。`);
             const given = withWallet({ ...state, money: state.money - action.amount }, action.to, walletOf(state, action.to) + action.amount);
             return { state: given, note: `包了 ${action.amount} 的紅包給${guest.name}`, to: action.to };
+        }
+        case "give_furniture": {
+            if (context.actor === "game")
+                throw new Error("小屋自己不送家具。");
+            const guest = state.visitors?.[action.to];
+            if (!guest)
+                throw new Error("屋裡沒有這位客人。");
+            if (isOutside(guest.spot.room))
+                throw new Error(`${guest.name}在街上。`);
+            const spec = furniture[action.item];
+            if (!spec)
+                throw new Error(`沒有「${action.item}」這種家具。`);
+            if ((state.inventory[action.item] ?? 0) < 1)
+                throw new Error(`倉庫裡沒有${spec.label}，先去家具店買。`);
+            const mine = guestFurnitureOf(state, action.to);
+            const given = withGuestFurniture({ ...state, inventory: adjust(state.inventory, action.item, -1) }, action.to, { ...mine, owned: adjust(mine.owned, action.item, 1) });
+            return { state: given, note: `送了一件${spec.label}給${guest.name}`, to: action.to };
         }
         case "give": {
             if (context.actor === "game")
@@ -648,8 +669,8 @@ function reduce(state, action, context) {
                 throw new Error("小屋自己不關門。");
             if (!state.door?.open)
                 throw new Error("門本來就關著。");
-            const guests = Object.values(state.visitors ?? {});
-            const tidied = guests.reduce((next, guest) => returnHolding(next, guest, furniture), state); // 客人手上的東西放回桌上
+            const guests = Object.entries(state.visitors ?? {});
+            const tidied = guests.reduce((next, [id, guest]) => leaveLodging(returnHolding(next, guest, furniture), id), state); // 客人手上的東西放回桌上、客房退掉（長住的留著）
             return { state: { ...tidied, door: { open: false, by: context.actor, at: context.now().toISOString() }, visitors: {}, invitations: [] }, note: guests.length ? "關上門，客人都回家了" : "關上門" };
         }
         case "say_guests": {
@@ -978,6 +999,42 @@ function reduce(state, action, context) {
             const spot = leaveInnSpot(state.positions[context.actor]);
             return { state: { ...state, positions: { ...state.positions, [context.actor]: spot } }, note: `走出${INN_LABEL}` };
         }
+        case "check_in_guest": {
+            if (context.actor === "game")
+                throw new Error("小屋自己不帶客人。");
+            const guest = state.visitors?.[action.guest];
+            if (!guest)
+                throw new Error("屋裡沒有這位客人。");
+            return { state: checkIn(state, context.content, action.guest, action.room, context.now()), note: `帶${guest.name}到${findRoom(state, action.room).name}`, to: action.guest };
+        }
+        case "grant_room": {
+            if (context.actor === "game")
+                throw new Error("小屋自己不送房間。");
+            if (!state.visitors?.[action.guest] && !state.visitorProfiles?.[action.guest])
+                throw new Error("沒有這位客人。");
+            const room = findRoom(state, action.room);
+            if (!isGuestRoom(state, context.content, action.room))
+                throw new Error(`${room.name}不是客房。`);
+            const current = state.guestRooms?.[action.room];
+            if (current && current.holder !== action.guest)
+                throw new Error(`${room.name}是${visitorName(state, current.holder)}${current.permanent ? "長住" : "登記"}的。`);
+            const elsewhere = lodgingOf(state, action.guest);
+            if (elsewhere && elsewhere.roomId !== action.room)
+                throw new Error(`${visitorName(state, action.guest)}已經登記了${findRoom(state, elsewhere.roomId).name}。`);
+            const lodging = { holder: action.guest, since: current?.since ?? context.now().toISOString(), lodgers: current?.lodgers ?? [], permanent: true };
+            return { state: { ...state, guestRooms: { ...state.guestRooms, [action.room]: lodging } }, note: `把${room.name}給${visitorName(state, action.guest)}長住`, to: action.guest };
+        }
+        case "revoke_room": {
+            if (context.actor === "game")
+                throw new Error("小屋自己不收房間。");
+            const room = findRoom(state, action.room);
+            const current = state.guestRooms?.[action.room];
+            if (!current?.permanent)
+                throw new Error(`${room.name}沒有給誰長住。`);
+            const { permanent: _permanent, ...plain } = current;
+            const stillHere = !!state.visitors?.[current.holder];
+            return { state: stillHere ? { ...state, guestRooms: { ...state.guestRooms, [action.room]: plain } } : clearLodging(state, action.room), note: `收回${room.name}` };
+        }
         case "pet_cat": {
             if (context.actor === "game")
                 throw new Error("小屋自己不摸貓。");
@@ -1037,18 +1094,25 @@ function reduce(state, action, context) {
                 throw new Error(`已經有${spec.label}了。`);
             if (state.money < spec.price)
                 throw new Error(`錢不夠：蓋${spec.label}要 ${spec.price}，現在有 ${state.money}。`);
+            let base = state;
+            let prelude = "";
             if (spec.connectsTo && !state.rooms[spec.connectsTo]) {
-                const neighbor = context.content.rooms[spec.connectsTo]?.label ?? spec.connectsTo;
-                throw new Error(`${spec.label}要接在${neighbor}旁邊，先蓋好${neighbor}才能蓋。`);
+                const neighborSpec = context.content.rooms[spec.connectsTo];
+                const neighbor = neighborSpec?.label ?? spec.connectsTo;
+                if (neighborSpec?.price !== 0)
+                    throw new Error(`${spec.label}要接在${neighbor}旁邊，先蓋好${neighbor}才能蓋。`);
+                base = reduce(state, { kind: "build_room", room: spec.connectsTo }, context).state; // 免費的父房（二樓小客廳）順手先搭
+                prelude = `先搭了${neighbor}，`;
             }
-            const parentId = spec.connectsTo ?? (state.rooms[CONNECTOR_ROOM] ? CONNECTOR_ROOM : FIRST_ROOM);
-            const parent = findRoom(state, parentId);
+            const parentId = spec.connectsTo ?? (base.rooms[CONNECTOR_ROOM] ? CONNECTOR_ROOM : FIRST_ROOM);
+            const parent = findRoom(base, parentId);
             const at = freeDoorSpot(parent, furniture);
             if (!at)
                 throw new Error(`${parent.name}的牆邊都被家具擋住了，挪出一格才能開門。`);
             const room = { kind: action.room, name: spec.label, width: spec.width, depth: spec.depth, placed: [], doors: [{ wall: "left", at: Math.floor(spec.depth / 2), to: parentId }], ...(spec.floor ? { floor: spec.floor } : {}) };
-            const rooms = { ...state.rooms, [parentId]: { ...parent, doors: [...parent.doors, { ...at, to: action.room }] }, [action.room]: room };
-            return { state: { ...state, money: state.money - spec.price, rooms }, note: `花 ${spec.price} 蓋了${spec.label}，門開在${parent.name}` };
+            const rooms = { ...base.rooms, [parentId]: { ...parent, doors: [...parent.doors, { ...at, to: action.room }] }, [action.room]: room };
+            const cost = spec.price ? `花 ${spec.price} 蓋了` : "搭了";
+            return { state: { ...base, money: base.money - spec.price, rooms }, note: `${prelude}${cost}${spec.label}，門開在${parent.name}` };
         }
         case "decorate_room": {
             if (context.actor === "game")
@@ -1213,16 +1277,18 @@ const CONNECTOR_ROOM = "living";
 export function doorCell(door) {
     return door.wall === "back" ? { x: door.at, y: 0 } : { x: 0, y: door.at };
 }
-/** 牆邊找一格開新門：先找後牆（從右往左）、再找左牆（從前往後）；要站得進去、不是座位、還沒有門。 */
-function freeDoorSpot(room, catalog) {
+/** 牆邊找一格開新門：先找後牆（從右往左）、再找左牆（從前往後）；要站得進去、不是座位、還沒有門。
+ *  跟別的門相鄰的格子排到最後，同一面牆上的門才不會擠成一排（二樓小客廳三扇客房門）。 */
+export function freeDoorSpot(room, catalog) {
     const candidates = [];
     for (let x = room.width - 1; x >= 1; x--)
         candidates.push({ wall: "back", at: x });
     for (let y = room.depth - 1; y >= 1; y--)
         candidates.push({ wall: "left", at: y });
     const doors = new Set(room.doors.map((d) => cellKey(doorCell(d))));
+    const nextToDoor = (spot) => room.doors.some((d) => d.wall === spot.wall && Math.abs(d.at - spot.at) === 1);
     const hung = new Set(room.placed.flatMap((p) => wallSlots(p, catalog))); // 窗戶那段牆不開門
-    return candidates.find((spot) => {
+    const usable = candidates.filter((spot) => {
         const cell = doorCell(spot);
         if (doors.has(cellKey(cell)) || hung.has(`${spot.wall}:${spot.at}`) || seatAt(room, cell, catalog))
             return false;
@@ -1233,7 +1299,8 @@ function freeDoorSpot(room, catalog) {
         catch {
             return false;
         }
-    }) ?? null;
+    });
+    return usable.find((spot) => !nextToDoor(spot)) ?? usable[0] ?? null;
 }
 function cellKey(cell) {
     return `${cell.x},${cell.y}`;
@@ -1525,6 +1592,22 @@ export function answerInvite(state, id, who, accept, catalog, now) {
     const answered = { ...state, invitations: state.invitations.map((candidate) => (candidate.id === id ? { ...candidate, status: accept ? "accepted" : "declined", answeredAt: now.toISOString() } : candidate)) };
     if (!accept)
         return { state: answered, note: `現在不方便（${inviter.name}的邀請）` };
+    if (invitation.room) { // 同住：住進邀請人登記的客房、走到那間房門口
+        const lodging = state.guestRooms?.[invitation.room];
+        if (!lodging || lodging.holder !== invitation.from)
+            throw new Error(`${inviter.name}已經不在那間客房了。`);
+        const elsewhere = lodgingOf(state, who);
+        if (elsewhere && elsewhere.roomId !== invitation.room)
+            throw new Error(`你已經登記了${findRoom(state, elsewhere.roomId).name}。`);
+        const room = findRoom(state, invitation.room);
+        const door = room.doors[0] ? doorCell(room.doors[0]) : { x: 0, y: 0 };
+        const [spot] = freeCellsNear(state, invitation.room, door, catalog, peopleSpots(state, who));
+        if (!spot)
+            throw new Error(`${room.name}擠不下了。`);
+        const lodged = withLodging(answered, invitation.room, { ...lodging, lodgers: lodging.lodgers.includes(who) ? lodging.lodgers : [...lodging.lodgers, who] });
+        const { asleep: _asleep, ...guest } = state.visitors[who];
+        return { state: { ...lodged, visitors: { ...lodged.visitors, [who]: { ...guest, spot } } }, note: `答應${inviter.name}的邀請，住進${room.name}` };
+    }
     const [spot] = freeCellsNear(state, inviter.spot.room, inviter.spot, catalog, peopleSpots(state, who));
     if (!spot)
         throw new Error(`${inviter.name}旁邊沒有位子了。`);
@@ -1811,6 +1894,201 @@ function everyoneSpots(state, except) {
     const hosts = ["atone", "tsunu"].filter((who) => who !== except && isHome(state, who)).map((who) => state.positions[who]);
     const guests = Object.entries(state.visitors ?? {}).filter(([id]) => id !== except).map(([, visitor]) => visitor.spot);
     return [...hosts, ...guests];
+}
+// ---------- 客房：客人登記一間、同住、長住；屋主替客人登記也走同一套 ----------
+const GUEST_ROOM_FULL = "客房都有人了，等有人退房再來。";
+export const isGuestRoom = (state, content, roomId) => content.rooms[state.rooms[roomId]?.kind ?? ""]?.guest === true;
+/** 這位客人登記（或同住）的客房；沒有就 null。 */
+export function lodgingOf(state, visitorId) {
+    for (const [roomId, lodging] of Object.entries(state.guestRooms ?? {})) {
+        if (lodging.holder === visitorId || lodging.lodgers.includes(visitorId))
+            return { roomId, lodging };
+    }
+    return null;
+}
+/** 客人的名字：在屋裡的用現在的，不在的用上次的外表紀錄。 */
+export function visitorName(state, id) {
+    return state.visitors?.[id]?.name ?? state.visitorProfiles?.[id]?.name ?? "客人";
+}
+/** 登記一間客房：要是客房、沒人登記（長住的只有本人）、自己沒登記別間；長住的本人回來就沿用那筆登記。 */
+export function checkIn(state, content, visitorId, roomId, now) {
+    const room = findRoom(state, roomId);
+    if (!isGuestRoom(state, content, roomId))
+        throw new Error(`${room.name}不是客房。`);
+    const mine = lodgingOf(state, visitorId);
+    if (mine && mine.roomId !== roomId)
+        throw new Error(`已經登記了${findRoom(state, mine.roomId).name}。`);
+    const current = state.guestRooms?.[roomId];
+    if (current && current.holder !== visitorId && !current.lodgers.includes(visitorId)) {
+        const free = Object.keys(state.rooms).some((id) => isGuestRoom(state, content, id) && !state.guestRooms?.[id]);
+        if (!free)
+            throw new Error(GUEST_ROOM_FULL);
+        throw new Error(`${room.name}是${visitorName(state, current.holder)}${current.permanent ? "長住" : "登記"}的。`);
+    }
+    const lodging = current ?? { holder: visitorId, since: now.toISOString(), lodgers: [] };
+    const lodged = { ...state, guestRooms: { ...state.guestRooms, [roomId]: lodging } };
+    return lodging.holder === visitorId ? restoreLayout(lodged, content.furniture, roomId, visitorId).state : lodged;
+}
+/** 登記時鋪回去放不下的件數（日誌要寫一句）：登記前後倉庫多了幾件。 */
+export function leftoverAfterCheckIn(before, after, visitorId) {
+    const count = (data) => Object.values(data.owned).reduce((sum, n) => sum + n, 0);
+    return Math.max(0, count(guestFurnitureOf(after, visitorId)) - count(guestFurnitureOf(before, visitorId)));
+}
+/** 客人離開客房（回家、關門、同住的人退房）：同住的人就從名單移除；登記的人走了，同住的第一位接手；最後一人走才清房；長住的房不清。 */
+export function leaveLodging(state, visitorId) {
+    const found = lodgingOf(state, visitorId);
+    if (!found)
+        return state;
+    const { roomId, lodging } = found;
+    if (lodging.holder !== visitorId)
+        return withLodging(state, roomId, { ...lodging, lodgers: lodging.lodgers.filter((id) => id !== visitorId) });
+    const [next, ...rest] = lodging.lodgers;
+    if (next)
+        return withLodging(handOverFurniture(state, roomId, visitorId, next), roomId, { ...lodging, holder: next, lodgers: rest });
+    if (lodging.permanent)
+        return state;
+    return clearLodging(state, roomId);
+}
+/** 自己退房：同住的人退自己；登記的人退就整間清掉（同住的一起退）；長住的不用退。 */
+export function checkOut(state, visitorId) {
+    const found = lodgingOf(state, visitorId);
+    if (!found)
+        throw new Error("你沒有登記客房。");
+    const { roomId, lodging } = found;
+    if (lodging.holder !== visitorId)
+        return { state: leaveLodging(state, visitorId), roomId };
+    if (lodging.permanent)
+        throw new Error(`${findRoom(state, roomId).name}是屋主給你長住的，不用退房。`);
+    return { state: clearLodging(state, roomId), roomId };
+}
+/** 清房：登記取消，登記的人的家具收回他的擺設紀錄。 */
+export function clearLodging(state, roomId) {
+    const { [roomId]: gone, ...rest } = state.guestRooms ?? {};
+    const stored = gone ? storeLayout(state, roomId, gone.holder) : state;
+    return { ...stored, guestRooms: rest };
+}
+function withLodging(state, roomId, lodging) {
+    return { ...state, guestRooms: { ...state.guestRooms, [roomId]: lodging } };
+}
+// ---------- 客人的家具：自己的倉庫、擺在自己客房裡的（帶 owner）、收起來時的擺設 ----------
+const EMPTY_GUEST_FURNITURE = { owned: {}, layout: [] };
+export const guestFurnitureOf = (state, id) => state.visitorFurniture?.[id] ?? EMPTY_GUEST_FURNITURE;
+const withGuestFurniture = (state, id, data) => ({ ...state, visitorFurniture: { ...state.visitorFurniture, [id]: data } });
+/** 這件家具誰能動：沒有 owner 是屋主的，客人動不了；有 owner 只有那間房的登記人（與同住的人）能動。 */
+export function assertOwnedBy(state, piece, holder) {
+    if (!piece.owner) {
+        if (holder !== null)
+            throw new Error("那是屋主的家具。");
+        return;
+    }
+    if (piece.owner !== holder)
+        throw new Error(`那是${visitorName(state, piece.owner)}的家具。`);
+}
+/** 把房裡 owner 是這位客人的家具全部收回他的擺設紀錄（位置、轉向、顏色留著；桌上的東西不留）。 */
+function storeLayout(state, roomId, holder) {
+    const room = state.rooms[roomId];
+    if (!room)
+        return state;
+    const mine = room.placed.filter((piece) => piece.owner === holder);
+    if (!mine.length)
+        return state;
+    const layout = mine.map(({ id, item, x, y, flip, back, tint }) => ({ id, item, x, y, flip, owner: holder, ...(back ? { back } : {}), ...(tint ? { tint } : {}) }));
+    const data = guestFurnitureOf(state, holder);
+    const kept = withRoom(state, roomId, { ...room, placed: room.placed.filter((piece) => piece.owner !== holder) });
+    return withGuestFurniture(kept, holder, { ...data, layout: [...data.layout, ...layout] });
+}
+/** 登記時把擺設鋪回房裡：放得下的照原位擺，放不下的進倉庫。回傳放不下的件數。 */
+export function restoreLayout(state, catalog, roomId, holder) {
+    const data = guestFurnitureOf(state, holder);
+    if (!data.layout.length)
+        return { state, leftover: 0 };
+    let room = findRoom(state, roomId);
+    let owned = data.owned;
+    let leftover = 0;
+    for (const piece of data.layout) {
+        const placed = { ...piece, owner: holder };
+        try {
+            assertFits(room, placed, catalog);
+            room = { ...room, placed: [...room.placed, placed] };
+        }
+        catch {
+            owned = adjust(owned, piece.item, 1);
+            leftover++;
+        }
+    }
+    return { state: withGuestFurniture(withRoom(state, roomId, room), holder, { owned, layout: [] }), leftover };
+}
+/** 登記的人換人（原本的走了、同住的接手）：房裡的家具與擺設紀錄都變成接手的人的。 */
+function handOverFurniture(state, roomId, from, to) {
+    const room = state.rooms[roomId];
+    const retagged = room ? withRoom(state, roomId, { ...room, placed: room.placed.map((piece) => (piece.owner === from ? { ...piece, owner: to } : piece)) }) : state;
+    const fromData = guestFurnitureOf(retagged, from), toData = guestFurnitureOf(retagged, to);
+    if (!fromData.layout.length)
+        return retagged;
+    return withGuestFurniture(withGuestFurniture(retagged, from, { ...fromData, layout: [] }), to, { ...toData, layout: [...toData.layout, ...fromData.layout.map((piece) => ({ ...piece, owner: to }))] });
+}
+/** 客人買賣家具：目錄跟屋主同一份、同價；賣回五折。 */
+export function buyGuestFurniture(state, catalog, id, item) {
+    const spec = catalog[item];
+    if (!spec)
+        throw new Error(`沒有「${item}」這種家具。`);
+    const mine = walletOf(state, id);
+    if (mine < spec.price)
+        throw new Error(`錢不夠：${spec.label}要 ${spec.price}，你有 ${mine}。`);
+    const data = guestFurnitureOf(state, id);
+    return { state: withGuestFurniture(withWallet(state, id, mine - spec.price), id, { ...data, owned: adjust(data.owned, item, 1) }), note: `花 ${spec.price} 買了${spec.label}` };
+}
+export function sellGuestFurniture(state, catalog, id, item) {
+    const spec = catalog[item];
+    if (!spec)
+        throw new Error(`沒有「${item}」這種家具。`);
+    const data = guestFurnitureOf(state, id);
+    if ((data.owned[item] ?? 0) < 1)
+        throw new Error(`倉庫裡沒有${spec.label}。`);
+    const refund = Math.floor(spec.price * RESALE_RATE);
+    return { state: withGuestFurniture(withWallet(state, id, walletOf(state, id) + refund), id, { ...data, owned: adjust(data.owned, item, -1) }), note: `把${spec.label}賣回家具店，拿回 ${refund}` };
+}
+/** 客人擺自己的家具：要登記了客房、人在那間房、倉庫有；家具記登記人的 id。 */
+export function placeGuestFurniture(state, catalog, id, spot, action, newId) {
+    const { roomId, holder } = guestRoomFor(state, id, spot);
+    const spec = catalog[action.item];
+    if (!spec)
+        throw new Error(`沒有「${action.item}」這種家具。`);
+    const data = guestFurnitureOf(state, holder);
+    if ((data.owned[action.item] ?? 0) < 1)
+        throw new Error(`倉庫裡沒有${spec.label}。`);
+    const room = findRoom(state, roomId);
+    const piece = { id: newId, item: action.item, x: action.x, y: action.y, flip: action.flip ?? false, owner: holder };
+    assertFits(room, piece, catalog);
+    const placed = withRoom(state, roomId, { ...room, placed: [...room.placed, piece] });
+    return { state: withGuestFurniture(placed, holder, { ...data, owned: adjust(data.owned, action.item, -1) }), note: `把${spec.label}放到${room.name} (${action.x}, ${action.y})` };
+}
+/** 客人搬、轉、收自己的家具：人要在那間房，家具要是這間房登記人的。 */
+export function moveGuestFurniture(state, catalog, id, spot, action) {
+    const { roomId, holder } = guestRoomFor(state, id, spot);
+    const { piece, roomId: pieceRoom } = findPlaced(state, action.id);
+    if (pieceRoom !== roomId)
+        throw new Error("那件家具不在這間房。");
+    assertOwnedBy(state, piece, holder);
+    const room = findRoom(state, roomId);
+    const name = catalog[piece.item]?.label ?? piece.item;
+    if (action.kind === "store") {
+        const data = guestFurnitureOf(state, holder);
+        const kept = withRoom(state, roomId, { ...room, placed: room.placed.filter((p) => p.id !== piece.id) });
+        return { state: withGuestFurniture(kept, holder, { ...data, owned: adjust(data.owned, piece.item, 1) }), note: `把${name}收回倉庫` };
+    }
+    const moved = action.kind === "move" ? { ...piece, x: action.x, y: action.y } : { ...piece, flip: !piece.flip };
+    assertFits(room, moved, catalog, piece.id);
+    return { state: replacePlaced(state, moved), note: action.kind === "move" ? `把${name}搬到 (${action.x}, ${action.y})` : `把${name}轉向` };
+}
+/** 客人要動家具時：他登記（或同住）的客房與那間的登記人；人要站在那間房裡。 */
+function guestRoomFor(state, id, spot) {
+    const found = lodgingOf(state, id);
+    if (!found)
+        throw new Error("先登記一間客房，才能擺自己的家具。");
+    if (spot.room !== found.roomId)
+        throw new Error(`要先走到${findRoom(state, found.roomId).name}。`);
+    return { roomId: found.roomId, holder: found.lodging.holder };
 }
 /** 一個位置用文字講在哪：家裡寫房名與格子，街上寫 x，店與旅館寫名字（浴場分池邊、池裡）。 */
 export function placeName(rooms, spot) {
