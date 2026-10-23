@@ -1,4 +1,5 @@
-// 每家開著的店每次檢查該發生的事：等太久的客人離開、有貨就自動出餐、店開著、沒排滿也沒在這一輪賣光就可能來一位新客人。
+// 每家開著的店每次檢查該發生的事：等太久的客人離開、有貨就自動出餐、店開著又沒排滿就可能來一位新客人。
+// 新客人只點還有貨的品項（排隊中的人已經點走的那份不算），整家店都沒貨又沒人排隊就先打烊。
 // 純函式：只回傳要套用的動作，亂數與 id 由呼叫端給，小屋的時鐘與兒童版的時鐘共用。
 import { AUTO_SERVE_MS, CUSTOMER_PATIENCE_MS, SHOP_QUEUE, shopOf } from "./state.js";
 export const SHOP_TICK_MS = 5_000;
@@ -11,31 +12,37 @@ export function shopTick(state, content, now, rand, newId) {
     const stock = { ...state.products }; // 各店共用商品庫存，一份貨只出給一位客人
     for (const [kind, shop] of Object.entries(state.shops)) {
         const chains = Object.keys(content.recipes).filter((chain) => shopOf(content.recipes[chain]) === kind); // 客人只點自家店的商品
-        let waiting = shop.customers.length;
+        const waitingFor = []; // 這一輪之後還在排隊的人各點了什麼：那些貨已經有主了
         let servedNow = false;
         for (const customer of shop.customers) {
             const waited = now.getTime() - new Date(customer.arrivedAt).getTime();
             const handsFull = customer.visitor && !!state.visitors?.[customer.id]?.holding; // 真客人手上有東西：先不出餐，等他放下
             if (waited > CUSTOMER_PATIENCE_MS && !customer.visitor) { // 真客人不會等太久就走，自己決定什麼時候離開
                 actions.push({ kind: "customer_leave", id: customer.id });
-                waiting--;
             }
             else if (waited > AUTO_SERVE_MS && !handsFull && (stock[customer.wants] ?? 0) > 0) {
                 actions.push({ kind: "serve", customer: customer.id });
                 stock[customer.wants] -= 1;
-                waiting--;
                 servedNow = true;
             }
+            else {
+                waitingFor.push(customer.wants);
+            }
         }
-        if (!chains.length)
+        if (!chains.length || !shop.open)
             continue;
-        const closing = servedNow && chains.every((chain) => !stock[chain]); // 出餐把貨賣光時 serve 會順手打烊，新客人進不了門
-        const demand = orderWeights(chains.map((chain) => content.recipes[chain].price));
-        const spend = chains.reduce((sum, chain, i) => sum + demand[i] * content.recipes[chain].price, 0); // 這家店每位客人平均花多少
+        const available = chains.filter((chain) => (stock[chain] ?? 0) > waitingFor.filter((wants) => wants === chain).length);
+        if (!available.length) {
+            if (!servedNow && !waitingFor.length)
+                actions.push({ kind: "shop_open", open: false, shop: kind }); // 賣光了先打烊；出餐賣光的那一輪 serve 自己會打烊
+            continue;
+        }
+        const demand = orderWeights(available.map((chain) => content.recipes[chain].price));
+        const spend = available.reduce((sum, chain, i) => sum + demand[i] * content.recipes[chain].price, 0); // 這家店每位客人平均花多少
         const openingDay = shop.openedAt !== undefined && now.getTime() - new Date(shop.openedAt).getTime() < OPENING_DAY_MS;
         const arrivalChance = SHOP_TICK_MS / (ARRIVAL_MEAN_MS * Math.max(1, spend / REFERENCE_PRICE)) / (openingDay ? 2 : 1);
-        if (shop.open && !closing && waiting < SHOP_QUEUE && rand() < arrivalChance) {
-            actions.push({ kind: "customer_arrive", id: newId(), wants: chains[pick(demand, rand())], look: Math.floor(rand() * LOOK_SEEDS), ...(kind !== "cafe" ? { shop: kind } : {}) });
+        if (waitingFor.length < SHOP_QUEUE && rand() < arrivalChance) {
+            actions.push({ kind: "customer_arrive", id: newId(), wants: available[pick(demand, rand())], look: Math.floor(rand() * LOOK_SEEDS), ...(kind !== "cafe" ? { shop: kind } : {}) });
         }
     }
     return actions;

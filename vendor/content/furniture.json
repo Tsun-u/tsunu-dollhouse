@@ -392,6 +392,14 @@
    "x": 675,
    "y": 689,
    "width": 390
+  },
+  "back": {
+   "image": "assets/furniture/tv_back.png",
+   "anchor": {
+    "x": 675,
+    "y": 670,
+    "width": 379
+   }
   }
  },
  "dining_table": {
@@ -577,7 +585,10 @@
    "width": 260
   },
   "switch": true,
-  "glow": 70
+  "glow": 70,
+  "stackOn": [
+   "nightstand"
+  ]
  },
  "gummy_bear": {
   "label": "大小熊軟糖",

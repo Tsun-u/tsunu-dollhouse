@@ -491,9 +491,7 @@ export class RoomView {
     if (character.lean) bendAtHips(pose, character.lean);
     const half = skeleton.data.canvas.w * scale / 2;
     const seat = seated(character) ? this.seatAt(character.pos) : null;
-    const side = seat ? this.seatSide(seat) : null;
-    const facingDrop = character.bathing && view !== "back34" ? this.catalog[seat.item].facingSitDrop : undefined;   // 泡澡露正面的人沉深一點
-    const seatDrop = seat ? facingDrop ?? side.sitDrop ?? (this.facesAway(seat) ? AWAY_SIT_DROP : SIT_DROP) : 0;   // 坐著時腳落在格子前緣，屁股才會在坐墊上
+    const seatDrop = this.seatDropOf(character);
     const shift = seat ? this.sitShift(seat) : 0;
     const undressed = character.bathing || character.showering;   // 泡澡、淋浴連內衣都脫掉（水面、霧面玻璃擋住身體）
     const outfits = undressed ? character.headParts ?? [] : indoorOutfits(character);
@@ -718,6 +716,13 @@ export class RoomView {
     return { x: Math.floor((dx + dy) / 2), y: Math.floor((dy - dx) / 2) };
   }
 
+  /** 點在牆上的位置換成貼牆的格子：從點的正下方量到地板邊，角落右邊是後牆（y 0）、左邊是左牆（x 0，flip）。 */
+  wallCellAt(px) {
+    const dx = (px - this.originX) / (TILE_W / 2);
+    if (dx >= 0) return { x: Math.min(this.home.width - 1, Math.floor(dx)), y: 0 };
+    return { x: 0, y: Math.min(this.home.depth - 1, Math.floor(-dx)), flip: true };
+  }
+
   /** 畫布的實際像素跟著顯示尺寸與裝置像素比走，畫圖仍用邏輯座標。 */
   resize() {
     const rect = this.canvas.getBoundingClientRect();
@@ -752,11 +757,12 @@ export class RoomView {
     const who = this.characterAt(px, py), dog = who ? null : this.petAt(px, py);
     const door = who || dog ? null : this.doorAt(px, py);
     const piece = who || dog || door ? null : this.pieceAt(px, py);
-    this.drag = { piece, who, dog, door, startX: px, startY: py, cell: piece ? { x: piece.x, y: piece.y } : this.toCell(px, py), moved: false };
+    const draggable = !!piece && (this.handlers.canDrag?.(piece) ?? true);   // 搬不動的家具（別人的）只能點，拖了也不跟著手走
+    this.drag = { piece, who, dog, door, draggable, startX: px, startY: py, cell: piece ? { x: piece.x, y: piece.y } : this.toCell(px, py), moved: false };
   }
 
   onMove(e) {
-    if (!this.drag?.piece) return;
+    if (!this.drag?.draggable) return;
     const [px, py] = this.pointer(e);
     if (Math.hypot(px - this.drag.startX, py - this.drag.startY) > 6) this.drag.moved = true;
     if (!this.drag.moved) return;
@@ -776,14 +782,25 @@ export class RoomView {
     else if (drag.piece && drag.moved) this.handlers.onPieceDrop(drag.piece, drag.cell);
     else if (drag.piece) this.handlers.onPieceTap(drag.piece, this.toCell(drag.startX, drag.startY));
     else if (this.inRoom(drag.cell)) this.handlers.onCellTap(drag.cell);
+    else if (drag.cell.y < 0 || drag.cell.x < 0) this.handlers.onWallTap?.(this.wallCellAt(drag.startX));   // 點到牆上：掛牆的家具直覺會點牆
     this.draw();
   }
 
-  /** 點到哪個小人：以腳底為中心、小人高度的長方形。 */
+  /** 坐著、泡澡時人往下放幾 px：腳落在格子前緣、屁股才會在坐墊上；泡澡露正面的人沉深一點。站著是 0。 */
+  seatDropOf(character) {
+    const seat = seated(character) ? this.seatAt(character.pos) : null;
+    if (!seat) return 0;
+    const facingDrop = character.bathing && character.view !== "back34" ? this.catalog[seat.item].facingSitDrop : undefined;
+    return facingDrop ?? this.seatSide(seat).sitDrop ?? (this.facesAway(seat) ? AWAY_SIT_DROP : SIT_DROP);
+  }
+
+  /** 點到哪個小人：以畫出來的腳底為中心（泡澡、睡覺、抱抱時跟存檔的格子不同）、小人高度的長方形；躺著的人橫著，框放寬。 */
   characterAt(px, py) {
     return this.characters.find((who) => {
-      const [sx, sy] = this.toScreen(who.pos.x + 0.5, who.pos.y + 0.5);
-      return Math.abs(px - sx) < 22 && py < sy + 8 && py > sy - CHARACTER_HEIGHT;
+      if (!who.pos) return false;
+      const [sx, sy] = this.drawnSpot(who);
+      const feet = sy + this.seatDropOf(who);
+      return Math.abs(px - sx) < (lying(who) ? 50 : 22) && py < feet + 8 && py > feet - CHARACTER_HEIGHT;
     }) ?? null;
   }
 
@@ -796,7 +813,28 @@ export class RoomView {
 
   inRoom(cell) { return cell.x >= 0 && cell.y >= 0 && cell.x < this.home.width && cell.y < this.home.depth; }
 
-  depthOf(piece) { if (this.onWall(piece)) return -2; if (this.catalog[piece.item]?.floor) return -1; const { w, d } = this.footprint(piece); return piece.x + w + piece.y + d; }   // 地板層永遠先畫
+  depthOf(piece) {
+    if (this.onWall(piece)) return -2;   // 牆上的最先畫
+    if (this.catalog[piece.item]?.floor) return -1;   // 地板層永遠先畫
+    const base = this.stackBase(piece);
+    if (base) return this.depthOf(base) + 0.3;   // 疊在檯面上的緊接在底下那件之後、前景層之前
+    const { w, d } = this.footprint(piece);
+    return piece.x + w + piece.y + d;
+  }
+
+  /** 這件疊在哪件家具的檯面上（目錄 stackOn 列的、占地蓋住它的那件）；沒有就 null。 */
+  stackBase(piece) {
+    const bases = this.catalog[piece.item]?.stackOn;
+    if (!bases?.length) return null;
+    const cells = this.cellsOf(piece);
+    return this.home.placed.find((p) => p.id !== piece.id && bases.includes(p.item) && cells.every((cell) => this.cellsOf(p).includes(cell))) ?? null;
+  }
+
+  /** 疊在檯面上的東西畫面要抬高多少：底下那件的高度。 */
+  liftOf(piece) {
+    const base = this.stackBase(piece);
+    return base ? this.catalog[base.item].height * UNIT_H : 0;
+  }
 
   cellsOf(piece) {
     if (this.onWall(piece)) return [];   // 掛在牆上的不占地板
@@ -950,8 +988,9 @@ export class RoomView {
     }
     const { w, d } = this.footprint(piece);
     const h = this.catalog[piece.item].height * UNIT_H;
-    const [ax, ay] = this.toScreen(at.x, at.y), [bx, by] = this.toScreen(at.x + w, at.y);
-    const [cx, cy] = this.toScreen(at.x + w, at.y + d), [dx, dy] = this.toScreen(at.x, at.y + d);
+    const lift = this.liftOf(piece);   // 疊在檯面上的：整個框抬到底下那件的高度
+    const [ax, ay] = this.toScreen(at.x, at.y).map((v, i) => v - (i ? lift : 0)), [bx, by] = this.toScreen(at.x + w, at.y).map((v, i) => v - (i ? lift : 0));
+    const [cx, cy] = this.toScreen(at.x + w, at.y + d).map((v, i) => v - (i ? lift : 0)), [dx, dy] = this.toScreen(at.x, at.y + d).map((v, i) => v - (i ? lift : 0));
     const path = new Path2D();
     path.moveTo(ax, ay - h); path.lineTo(bx, by - h); path.lineTo(bx, by); path.lineTo(cx, cy); path.lineTo(dx, dy); path.lineTo(dx, dy - h); path.closePath();
     return { path, corners: { ax, ay, bx, by, cx, cy, dx, dy, h } };
@@ -1182,7 +1221,7 @@ export class RoomView {
     const { ctx } = this;
     for (const piece of this.home.placed) {
       if (!piece.on) continue;
-      const [sx, sy] = this.toScreen(piece.x + 0.5, piece.y + 0.5);
+      const [sx, sy] = this.toScreen(piece.x + 0.5, piece.y + 0.5).map((v, i) => v - (i ? this.liftOf(piece) : 0));
       const radius = this.catalog[piece.item]?.glow ?? 110;   // 小夜燈這類小燈的目錄寫 glow 縮小光圈
       const tint = this.catalog[piece.item]?.glowColor ?? "255, 214, 140";   // 南瓜燈的目錄寫 glowColor 換成橘光（"r, g, b"）
       const glow = ctx.createRadialGradient(sx, sy, 8, sx, sy, radius);

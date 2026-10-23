@@ -388,3 +388,8 @@ h2.section[hidden] { display: none; }
 .card .thumb.pending { display: block; border-radius: 10px; background: #f3e6d0; }   /* 縮圖還在畫 */
 .thumb.trimmed { display: block; background-repeat: no-repeat; background-position: center; }   /* 家具圖：只露出有東西的那塊 */
 #dogActions { align-items: center; }   /* 裝扮圖卡比文字鈕高，文字鈕不要被撐長 */
+/* 店裡沒貨：開門鈕旁跳出去工坊的圖示，輕輕跳動提醒 */
+.shop-buttons { display: inline-flex; align-items: center; gap: 8px; }
+.icon-btn.go-make { border-color: #f2c46d; background: #fff7d6; animation: nudge 1.6s ease-in-out infinite; }
+@keyframes nudge { 0%, 70%, 100% { transform: none; } 80% { transform: translateY(-4px); } 90% { transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .icon-btn.go-make { animation: none; } }

@@ -20,6 +20,19 @@ export function swatchRow(colors, current, onPick, disabled = false) {
   return row;
 }
 
+/** 家具布面與衣服的常用色票（屋主頁、訪客頁共用）。 */
+export const PALETTE = ["#e3d5bf", "#f4f1ea", "#b9b9b9", "#3a3a3a", "#f3dfa2", "#c8925b", "#d9a3a3", "#c6b8dc", "#b9cdb0", "#a9c1d9", "#4a5a7a"];
+
+/** 一排顏色：current 那個亮著，點了呼叫 onPick(color)；第一顆「原色」送 null（reset 是 false 就不放，花紋色那排用）。 */
+export function paletteRow(title, current, onPick, { reset = true } = {}) {
+  const label = Object.assign(document.createElement("span"), { textContent: title });
+  const resetButton = Object.assign(document.createElement("button"), { type: "button", className: "reset quiet", textContent: "原色", onclick: () => onPick(null) });
+  const swatches = PALETTE.map((color) => Object.assign(document.createElement("button"), {
+    type: "button", className: "color" + (current === color ? " on" : ""), title: color, style: `background:${color}`, onclick: () => onPick(color),
+  }));
+  return [label, ...(reset ? [resetButton] : []), ...swatches];
+}
+
 /** 染法的小色塊：素色是一塊顏色，花紋畫小預覽（paint 是 spike_player/patterns.js 的 paintSwatch）。衣服小卡、花紋列共用。
  *  畫布比畫面上的尺寸（14～24 px）大，手機高解析度螢幕上花紋才不糊。 */
 export function dyeSwatch(dye, paint, size = 28) {

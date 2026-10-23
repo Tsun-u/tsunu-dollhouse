@@ -46,6 +46,12 @@ export class House {
     const { content } = deps;
     this.room = new RoomView($("room"), content.furniture, {
       onCellTap: (cell) => this.tapCell(cell),
+      onWallTap: (cell) => {   // 拿著掛牆的家具點牆：掛到那一面牆的那一格
+        if (!this.pendingItem || !content.furniture[this.pendingItem]?.onWall) return;
+        deps.apply({ kind: "place", item: this.pendingItem, ...cell, room: this.roomId });
+        this.pendingItem = null;
+        this.render();
+      },
       onCharacterTap: (who) => deps.select(who.id),
       onPetTap: (dog) => { this.dogOpen = dog.id; this.renderDog(); },
       onDoorTap: (door) => this.goToRoom(door.to),

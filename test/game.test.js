@@ -54,10 +54,19 @@ test("遊戲存檔裡阿童、阿宇的穿著是空的（娃娃穿什麼記在�
 
 test("咖啡廳的時鐘帶客人上門（用店裡自己的身分套用）；玩家自己帶不了客人", () => {
   const game = createGame(content, memoryStorage());
+  game.replace({ ...game.state, products: { bean: 1 } });   // 客人只點店裡還有的東西
   cafeTick(game, new Date(), () => 0, () => "c1");
   const [customer] = game.state.shops.cafe.customers;
   assert.equal(customer?.id, "c1");
+  assert.equal(customer.wants, "bean");
   assert.throws(() => game.apply({ kind: "customer_arrive", id: "c2", wants: customer.wants, look: 0 }), /客人只會自己上門/);
+});
+
+test("店裡沒貨、也沒有客人在等，時鐘就讓店打烊", () => {
+  const game = createGame(content, memoryStorage());
+  cafeTick(game, new Date(), () => 0, () => "c1");
+  assert.equal(game.state.shops.cafe.customers.length, 0);
+  assert.equal(game.state.shops.cafe.open, false);
 });
 
 test("訂閱者在每次成功的動作後收到新狀態", () => {

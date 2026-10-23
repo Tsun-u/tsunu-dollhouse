@@ -12,7 +12,8 @@ export const DEFAULT_WALL = "plain";
 export const HUNGRY_HOURS = 12; // 狗這麼久沒吃正餐就餓了
 export const FULL_HOURS = 3; // 吃完正餐這段時間內還飽，不再吃
 export const TABLE_SLOTS = 3;
-export const INVITE_MS = 3 * 60_000; // 訪客的邀請沒回應多久過期
+export const INVITE_MS = 3 * 60_000; // 給 AI 的邀請沒回應多久過期
+export const HUMAN_INVITE_MS = 5 * 60_000; // 給人類的邀請（網頁客人、阿童）：要等他剛好看著畫面，給久一點
 export const INVITE_RESULT_MS = 2 * 60_000; // 回應過的邀請留多久（讓邀請的人看到結果）
 export const FRESH_MS = 2 * 60 * 60_000; // 商品放桌上超過兩小時，熱的就涼了、冰的就退冰了
 /** 桌上商品現在的狀態：熱的「還溫／涼了」，冰的「還冰／退冰了」，常溫的一直是「放著」。 */
@@ -98,11 +99,11 @@ const HOME_BODY_KINDS = new Set([
     "place", "move", "flip", "store", "wear", "dress", "dye_clothes", "open_door", "close_door", "say_guests", "paint_furniture", "wash", "cook", "eat", "pet", "feed", "dress_dog",
     "toggle", "tv_channel", "read", "shelve", "water", "put_on_table", "take_from_table", "give", "hug", "kiss", "call", "answer_invite", "sleep", "wake", "throw_ball", "throw_pillow",
     "walk", "wave", "build_room", "decorate_room", "go_street", "go_home",
-    "enter_inn", "choose_bath", "soak", "leave_pool", "leave_bath", "leave_inn", "pet_cat",
+    "enter_inn", "choose_bath", "soak", "leave_pool", "leave_bath", "leave_inn", "pet_cat", "drink_milk",
 ]);
 /** 人在街上、店裡、旅館時還做得了的事（其餘家裡的事要先回到屋裡）。 */
 const OUTSIDE_OK_KINDS = new Set([
-    "say_guests", "wave", "walk", "go_street", "go_home", "enter_inn", "choose_bath", "soak", "leave_pool", "leave_bath", "leave_inn", "pet_cat",
+    "say_guests", "wave", "walk", "go_street", "go_home", "enter_inn", "choose_bath", "soak", "leave_pool", "leave_bath", "leave_inn", "pet_cat", "drink_milk",
 ]);
 /** 套用一個動作，回傳新狀態；不合法就丟錯、狀態不變。每個成功動作 revision +1，值得記的動作寫一筆日誌。 */
 export function applyAction(state, action, context) {
@@ -205,15 +206,12 @@ function reduce(state, action, context) {
             assertOwnedBy(state, piece, null);
             const moved = { ...piece, x: action.x, y: action.y };
             assertFits(findRoom(state, roomId), moved, furniture, piece.id);
-            return { state: replacePlaced(state, moved), note: `把${label(piece.item)}搬到 (${action.x}, ${action.y})` };
+            return { state: withRoom(state, roomId, moveWithStacked(findRoom(state, roomId), moved, furniture)), note: `把${label(piece.item)}搬到 (${action.x}, ${action.y})` };
         }
         case "flip": {
             const { piece, roomId } = findPlaced(state, action.id);
             assertOwnedBy(state, piece, null);
-            // 牆上家具換到另一面牆的同一格；有背面圖的家具輪四個方向：朝右下 → 左下 → 左上 → 右上，每轉兩次換一次正反面
-            const spec = furniture[piece.item];
-            const flipped = spec?.onWall ? { ...piece, flip: !piece.flip, x: piece.y, y: piece.x }
-                : spec?.back ? { ...piece, flip: !piece.flip, back: piece.flip ? !piece.back : !!piece.back } : { ...piece, flip: !piece.flip };
+            const flipped = turned(piece, furniture[piece.item]);
             assertFits(findRoom(state, roomId), flipped, furniture, piece.id);
             return { state: replacePlaced(state, flipped), note: `把${label(piece.item)}轉向` };
         }
@@ -221,6 +219,7 @@ function reduce(state, action, context) {
             const { piece, roomId } = findPlaced(state, action.id);
             assertOwnedBy(state, piece, null);
             const room = findRoom(state, roomId);
+            assertNothingStacked(room, piece, furniture);
             return {
                 state: { ...withRoom(state, roomId, { ...room, placed: room.placed.filter((p) => p.id !== piece.id) }), inventory: adjust(state.inventory, piece.item, 1) },
                 note: `把${label(piece.item)}收回倉庫`,
@@ -298,12 +297,8 @@ function reduce(state, action, context) {
             return { state: { ...state, clothesColors: { ...state.clothesColors, [who]: colors } }, note };
         }
         case "paint_furniture": {
-            const { piece } = findPlaced(state, action.id);
-            if (!furniture[piece.item]?.dye)
-                throw new Error(`${label(piece.item)}不能換顏色。`);
-            const { tint: _old, ...plain } = piece;
-            const painted = action.color === null ? plain : { ...plain, tint: hexColor(action.color) };
-            return { state: replacePlaced(state, painted), note: action.color === null ? `把${label(piece.item)}換回原本的顏色` : `幫${label(piece.item)}換了布面顏色` };
+            const painted = repaint(findPlaced(state, action.id).piece, furniture, action.color);
+            return { state: replacePlaced(state, painted.piece), note: painted.note };
         }
         case "wear": {
             if (context.actor === "game")
@@ -564,7 +559,8 @@ function reduce(state, action, context) {
             if (action.open)
                 return { state: closed, note: `${SHOP_LABEL[kind]}開門了` };
             const out = sendGuestsToStreet(closed, kind);
-            return { state: out.state, note: `${SHOP_LABEL[kind]}打烊了${out.names.length ? `，${out.names.join("、")}走到街上` : ""}` };
+            const why = context.actor === "game" ? "賣光了，先打烊" : "打烊了"; // 時鐘關的店是因為沒貨了
+            return { state: out.state, note: `${SHOP_LABEL[kind]}${why}${out.names.length ? `，${out.names.join("、")}走到街上` : ""}` };
         }
         case "rent_shop": {
             if (context.actor !== "atone")
@@ -880,10 +876,10 @@ function reduce(state, action, context) {
             if (context.actor !== "game")
                 throw new Error("邀請只有小屋自己會讓它過期。");
             const now = context.now();
-            const expiring = (state.invitations ?? []).filter((invitation) => invitation.status === "pending" && inviteStale(invitation, now));
+            const expiring = (state.invitations ?? []).filter((invitation) => invitation.status === "pending" && inviteStale(state, invitation, now));
             const invitations = (state.invitations ?? [])
                 .map((invitation) => (expiring.includes(invitation) ? { ...invitation, status: "expired", answeredAt: now.toISOString() } : invitation))
-                .filter((invitation) => !inviteStale(invitation, now));
+                .filter((invitation) => !inviteStale(state, invitation, now));
             const note = expiring.map((invitation) => `${personName(state, invitation.to)}現在不方便（${personName(state, invitation.from)}的邀請過期了）`).join("；");
             return { state: { ...state, invitations }, note: note || null };
         }
@@ -1041,6 +1037,16 @@ function reduce(state, action, context) {
             if (state.positions[context.actor].room !== INN_LOBBY)
                 throw new Error(`要在${INN_LABEL}大廳才摸得到${context.content.inn.cat.label}。`);
             return { state, note: petCat(context.content.inn, action.touch) };
+        }
+        case "drink_milk": {
+            if (context.actor === "game")
+                throw new Error("小屋自己不喝牛奶。");
+            const milk = context.content.settings.inn.milk;
+            assertAtInnCounter(state.positions[context.actor], milk.label);
+            if (state.money < milk.price)
+                throw new Error(`錢不夠，${milk.label}一瓶 ${milk.price}（有 ${state.money}）。`);
+            const stamina = context.actor === "atone" ? fedStamina(state, 1, context) : state.stamina;
+            return { state: { ...state, money: state.money - milk.price, stamina }, note: milkNote(milk) };
         }
         case "walk": {
             if (context.actor === "game")
@@ -1622,11 +1628,19 @@ export function answerInvite(state, id, who, accept, catalog, now) {
 }
 /** 有沒有邀請該過期（沒回應超過 INVITE_MS）或該清掉（回應過超過 INVITE_RESULT_MS）：小屋時鐘用它決定要不要套用 expire_invites。 */
 export function inviteHousekeepingDue(state, now) {
-    return (state.invitations ?? []).some((invitation) => inviteStale(invitation, now));
+    return (state.invitations ?? []).some((invitation) => inviteStale(state, invitation, now));
 }
-const inviteStale = (invitation, now) => invitation.status === "pending"
-    ? now.getTime() - Date.parse(invitation.at) >= INVITE_MS
+/** 邀請等多久才過期：AI 幾秒就看得到通知，人類要等他剛好看著畫面，給久一點。阿宇是 AI；阿童與人類客人算人類。 */
+export const inviteWindow = (state, to) => to === "tsunu" || state.visitorProfiles?.[to]?.kind === "ai" ? INVITE_MS : HUMAN_INVITE_MS;
+const inviteStale = (state, invitation, now) => invitation.status === "pending"
+    ? now.getTime() - Date.parse(invitation.at) >= inviteWindow(state, invitation.to)
     : now.getTime() - Date.parse(invitation.answeredAt ?? invitation.at) >= INVITE_RESULT_MS;
+/** 旅館櫃檯：要站在大廳才買得到。 */
+function assertAtInnCounter(spot, label) {
+    if (spot.room !== INN_LOBBY)
+        throw new Error(`要在${INN_LABEL}大廳的櫃檯才買得到${label}。`);
+}
+export const milkNote = (milk) => `在${INN_LABEL}大廳買了一瓶${milk.label}，一口氣喝掉`;
 /** 這件家具在哪間房。 */
 export function placedRoom(state, id) {
     return findPlaced(state, id).roomId;
@@ -1715,7 +1729,33 @@ export function occupiedCells(piece, catalog) {
             cells.push(`${piece.x + dx},${piece.y + dy}`);
     return cells;
 }
-/** 地板層（地毯）只跟地板層互相擋；其他家具可以疊在地毯上，但不能擋門。 */
+/** 這件疊在房裡哪件家具的檯面上（目錄 stackOn 列的、占地整個蓋住它的那件）；沒有就 null。 */
+export function stackBase(room, piece, catalog) {
+    const bases = catalog[piece.item]?.stackOn;
+    if (!bases?.length)
+        return null;
+    const cells = occupiedCells(piece, catalog);
+    return room.placed.find((p) => p.id !== piece.id && bases.includes(p.item) && cells.every((cell) => occupiedCells(p, catalog).includes(cell))) ?? null;
+}
+/** 疊在這件家具檯面上的東西。 */
+export function stackedOn(room, base, catalog) {
+    return room.placed.filter((p) => stackBase(room, p, catalog)?.id === base.id);
+}
+/** 底下那件搬了，檯面上的東西跟著一起搬。 */
+function moveWithStacked(room, moved, catalog) {
+    const before = room.placed.find((p) => p.id === moved.id);
+    if (!before)
+        return room;
+    const riders = new Set(stackedOn(room, before, catalog).map((p) => p.id));
+    const dx = moved.x - before.x, dy = moved.y - before.y;
+    return { ...room, placed: room.placed.map((p) => (p.id === moved.id ? moved : riders.has(p.id) ? { ...p, x: p.x + dx, y: p.y + dy } : p)) };
+}
+function assertNothingStacked(room, piece, catalog) {
+    const rider = stackedOn(room, piece, catalog)[0];
+    if (rider)
+        throw new Error(`${catalog[piece.item]?.label ?? piece.item}上面還放著${catalog[rider.item]?.label ?? rider.item}，先把它收起來。`);
+}
+/** 地板層（地毯）只跟地板層互相擋；其他家具可以疊在地毯上，但不能擋門；目錄 stackOn 的小東西可以疊在那些家具的檯面上。 */
 function assertFits(room, piece, catalog, ignoreId) {
     if (!Number.isInteger(piece.x) || !Number.isInteger(piece.y))
         throw new Error("座標必須是整數格。");
@@ -1727,7 +1767,9 @@ function assertFits(room, piece, catalog, ignoreId) {
     if (piece.x < 0 || piece.y < 0 || piece.x + w > room.width || piece.y + d > room.depth)
         throw new Error("這個位置超出房間。");
     const onFloorLayer = !!catalog[piece.item]?.floor;
-    const blockers = room.placed.filter((p) => p.id !== ignoreId && !!catalog[p.item]?.floor === onFloorLayer);
+    const moving = ignoreId ? room.placed.find((p) => p.id === ignoreId) : undefined;
+    const riding = new Set([...(moving ? stackedOn(room, moving, catalog) : []), stackBase(room, piece, catalog)].filter((p) => !!p).map((p) => p.id)); // 跟著搬的、被疊的那件都不算擋
+    const blockers = room.placed.filter((p) => p.id !== ignoreId && !riding.has(p.id) && !!catalog[p.item]?.floor === onFloorLayer);
     const taken = new Set(blockers.flatMap((p) => occupiedCells(p, catalog)));
     if (occupiedCells(piece, catalog).some((cell) => taken.has(cell)))
         throw new Error("這個位置已經有東西了。");
@@ -2005,7 +2047,8 @@ export function restoreLayout(state, catalog, roomId, holder) {
     let room = findRoom(state, roomId);
     let owned = data.owned;
     let leftover = 0;
-    for (const piece of data.layout) {
+    const layout = [...data.layout].sort((a, b) => Number(!!catalog[a.item]?.stackOn) - Number(!!catalog[b.item]?.stackOn)); // 疊在檯面上的最後鋪，底下那件要先在
+    for (const piece of layout) {
         const placed = { ...piece, owner: holder };
         try {
             assertFits(room, placed, catalog);
@@ -2048,22 +2091,32 @@ export function sellGuestFurniture(state, catalog, id, item) {
     const refund = Math.floor(spec.price * RESALE_RATE);
     return { state: withGuestFurniture(withWallet(state, id, walletOf(state, id) + refund), id, { ...data, owned: adjust(data.owned, item, -1) }), note: `把${spec.label}賣回家具店，拿回 ${refund}` };
 }
-/** 客人擺自己的家具：要登記了客房、人在那間房、倉庫有；家具記登記人的 id。 */
+/** 客人擺自己的家具：要登記了客房、人在那間房、倉庫有；家具記登記人的 id（一間房的擺設是一套）。
+ *  同住的人先從自己的倉庫拿（買的、屋主送的都在那裡），自己沒有才拿登記人倉庫的。 */
 export function placeGuestFurniture(state, catalog, id, spot, action, newId) {
     const { roomId, holder } = guestRoomFor(state, id, spot);
     const spec = catalog[action.item];
     if (!spec)
         throw new Error(`沒有「${action.item}」這種家具。`);
-    const data = guestFurnitureOf(state, holder);
+    const source = (guestFurnitureOf(state, id).owned[action.item] ?? 0) >= 1 ? id : holder;
+    const data = guestFurnitureOf(state, source);
     if ((data.owned[action.item] ?? 0) < 1)
         throw new Error(`倉庫裡沒有${spec.label}。`);
     const room = findRoom(state, roomId);
     const piece = { id: newId, item: action.item, x: action.x, y: action.y, flip: action.flip ?? false, owner: holder };
     assertFits(room, piece, catalog);
     const placed = withRoom(state, roomId, { ...room, placed: [...room.placed, piece] });
-    return { state: withGuestFurniture(placed, holder, { ...data, owned: adjust(data.owned, action.item, -1) }), note: `把${spec.label}放到${room.name} (${action.x}, ${action.y})` };
+    return { state: withGuestFurniture(placed, source, { ...data, owned: adjust(data.owned, action.item, -1) }), note: `把${spec.label}放到${room.name} (${action.x}, ${action.y})` };
 }
 /** 客人搬、轉、收自己的家具：人要在那間房，家具要是這間房登記人的。 */
+/** 換布面顏色（null 換回原色）；只有目錄標 dye 的家具能換。屋主與客人共用。 */
+function repaint(piece, catalog, color) {
+    const name = catalog[piece.item]?.label ?? piece.item;
+    if (!catalog[piece.item]?.dye)
+        throw new Error(`${name}不能換顏色。`);
+    const { tint: _old, ...plain } = piece;
+    return color === null ? { piece: plain, note: `把${name}換回原本的顏色` } : { piece: { ...plain, tint: hexColor(color) }, note: `幫${name}換了布面顏色` };
+}
 export function moveGuestFurniture(state, catalog, id, spot, action) {
     const { roomId, holder } = guestRoomFor(state, id, spot);
     const { piece, roomId: pieceRoom } = findPlaced(state, action.id);
@@ -2072,14 +2125,27 @@ export function moveGuestFurniture(state, catalog, id, spot, action) {
     assertOwnedBy(state, piece, holder);
     const room = findRoom(state, roomId);
     const name = catalog[piece.item]?.label ?? piece.item;
+    if (action.kind === "paint") {
+        const painted = repaint(piece, catalog, action.color);
+        return { state: replacePlaced(state, painted.piece), note: painted.note };
+    }
     if (action.kind === "store") {
+        assertNothingStacked(room, piece, catalog);
         const data = guestFurnitureOf(state, holder);
         const kept = withRoom(state, roomId, { ...room, placed: room.placed.filter((p) => p.id !== piece.id) });
         return { state: withGuestFurniture(kept, holder, { ...data, owned: adjust(data.owned, piece.item, 1) }), note: `把${name}收回倉庫` };
     }
-    const moved = action.kind === "move" ? { ...piece, x: action.x, y: action.y } : { ...piece, flip: !piece.flip };
+    const moved = action.kind === "move" ? { ...piece, x: action.x, y: action.y } : turned(piece, catalog[piece.item]);
     assertFits(room, moved, catalog, piece.id);
-    return { state: replacePlaced(state, moved), note: action.kind === "move" ? `把${name}搬到 (${action.x}, ${action.y})` : `把${name}轉向` };
+    return { state: withRoom(state, roomId, moveWithStacked(room, moved, catalog)), note: action.kind === "move" ? `把${name}搬到 (${action.x}, ${action.y})` : `把${name}轉向` };
+}
+/** 轉向：牆上家具換到另一面牆的同一格；有背面圖的家具輪四個方向（朝右下 → 左下 → 左上 → 右上，每轉兩次換一次正反面）；其餘左右鏡射。屋主與客人共用。 */
+function turned(piece, spec) {
+    if (spec?.onWall)
+        return { ...piece, flip: !piece.flip, x: piece.y, y: piece.x };
+    if (spec?.back)
+        return { ...piece, flip: !piece.flip, back: piece.flip ? !piece.back : !!piece.back };
+    return { ...piece, flip: !piece.flip };
 }
 /** 客人要動家具時：他登記（或同住）的客房與那間的登記人；人要站在那間房裡。 */
 function guestRoomFor(state, id, spot) {

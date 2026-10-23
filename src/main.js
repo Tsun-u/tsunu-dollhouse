@@ -328,12 +328,16 @@ function renderCafe() {
   const waiting = shop.customers.length;
   const keeper = $("cafeInfo").dataset.keeper ? `今天${$("cafeInfo").dataset.keeper}顧店。` : "";
   $("cafeInfo").textContent = keeper + (shop.open ? (waiting ? `${label}：${waiting} 位客人在等，累計服務 ${shop.served} 人` : `${label}開著，等客人上門（累計服務 ${shop.served} 人）`) : `${label}打烊中`);
+  const mine = Object.entries(state.products).filter(([chain]) => (content.recipes[chain]?.shop ?? "cafe") === viewingShop);
+  // 店裡沒貨就開不了門（開了也會馬上賣光打烊）：太陽變灰，旁邊跳出去工坊的圖示
+  const goMake = () => iconButton("workshop", "去工坊做東西", () => showTab("workshop"), "big go-make");
+  $("cafeHint").replaceChildren(...(!mine.length && !shop.open ? [goMake()] : []));
+  $("cafeToggle").disabled = !mine.length && !shop.open;
   $("cafeToggle").replaceChildren(icon(shop.open ? "moon" : "sun"));
   $("cafeToggle").className = `icon-btn big ${shop.open ? "closing" : "opening"}`;
   $("cafeToggle").title = shop.open ? "打烊" : "開門";
   $("cafeToggle").setAttribute("aria-label", $("cafeToggle").title);
   $("cafeProductsHint").textContent = viewingShop === "boutique" ? "櫃台上的衣服（點客人就賣出；想自己穿就收進衣櫃）" : "櫃台上的商品（點客人就出餐）";
-  const mine = Object.entries(state.products).filter(([chain]) => (content.recipes[chain]?.shop ?? "cafe") === viewingShop);
   $("cafeProducts").replaceChildren(...mine.map(([chain, count]) => {
     const recipe = content.recipes[chain];
     const chip = Object.assign(document.createElement("span"), { className: "item" });
@@ -343,7 +347,7 @@ function renderCafe() {
     if (recipe?.clothes) chip.append(iconButton("closet", "收進衣櫃", () => apply({ kind: "keep_clothes", chain })));
     return chip;
   }));
-  if (!mine.length) $("cafeProducts").textContent = "櫃台空空的，去工坊做點東西。";
+  if (!mine.length) $("cafeProducts").replaceChildren(goMake());
   street.setState(state.shops, viewingShop);
   renderDecorPanel();
   const opened = Object.keys(state.shops);
