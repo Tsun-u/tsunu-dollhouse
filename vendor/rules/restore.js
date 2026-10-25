@@ -8,7 +8,19 @@ export function restore(snapshot, content) {
     const loaded = snapshot;
     if (loaded.version !== 1)
         throw new Error(`不認得的存檔版本：${String(loaded.version)}`);
-    return { ...createInitialState(), ...migratePumpkinSuit(migrateWorn(splitOutfits(mergeColorVariants(splitClothesColors(migrateShops(migrateUpstairs(migrateRooms(loaded), content)))), content), content)), puzzle: migratePuzzle(loaded.puzzle) };
+    return { ...createInitialState(), ...migratePumpkinSuit(migrateWorn(splitOutfits(mergeColorVariants(splitClothesColors(migrateShops(growRooms(migrateUpstairs(migrateRooms(loaded), content), content)))), content), content)), puzzle: migratePuzzle(loaded.puzzle) };
+}
+/** 目錄把房型改大了：已經蓋好的房間長到目錄的大小（只長不縮）。格子從最裡面的牆角算起，長出來的在鏡頭那側，家具、門的座標都不用動。 */
+function growRooms(loaded, content) {
+    if (!loaded.rooms)
+        return loaded;
+    const rooms = Object.fromEntries(Object.entries(loaded.rooms).map(([id, room]) => {
+        const spec = content.rooms[room.kind];
+        if (!spec || (room.width >= spec.width && room.depth >= spec.depth))
+            return [id, room];
+        return [id, { ...room, width: Math.max(room.width, spec.width), depth: Math.max(room.depth, spec.depth) }];
+    }));
+    return { ...loaded, rooms };
 }
 /** 南瓜小丑裝從上衣格搬到罩裙格（它是套在衣服外面的）：屋主、客人檔案、屋裡的客人身上穿的都搬。 */
 function migratePumpkinSuit(loaded) {

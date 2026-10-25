@@ -965,6 +965,183 @@
    }
   }
  },
+ "cards": {
+  "duration": 3.2,
+  "loop": true,
+  "easing": "easeInOutSine",
+  "tracks": {
+   "torso": [
+    {
+     "t": 0,
+     "y": 300
+    },
+    {
+     "t": 1.6,
+     "y": 298
+    },
+    {
+     "t": 3.2,
+     "y": 300
+    }
+   ],
+   "upper_leg_l": [
+    {
+     "t": 0,
+     "angle": 85
+    },
+    {
+     "t": 3.2,
+     "angle": 85
+    }
+   ],
+   "lower_leg_l": [
+    {
+     "t": 0,
+     "angle": 85
+    },
+    {
+     "t": 3.2,
+     "angle": 85
+    }
+   ],
+   "upper_leg_r": [
+    {
+     "t": 0,
+     "angle": 85
+    },
+    {
+     "t": 3.2,
+     "angle": 85
+    }
+   ],
+   "lower_leg_r": [
+    {
+     "t": 0,
+     "angle": 85
+    },
+    {
+     "t": 3.2,
+     "angle": 85
+    }
+   ],
+   "upper_arm_l": [
+    {
+     "t": 0,
+     "angle": 38
+    },
+    {
+     "t": 3.2,
+     "angle": 38
+    }
+   ],
+   "lower_arm_l": [
+    {
+     "t": 0,
+     "angle": 85
+    },
+    {
+     "t": 3.2,
+     "angle": 85
+    }
+   ],
+   "upper_arm_r": [
+    {
+     "t": 0,
+     "angle": 30
+    },
+    {
+     "t": 1.4,
+     "angle": 30
+    },
+    {
+     "t": 1.9,
+     "angle": 62
+    },
+    {
+     "t": 2.4,
+     "angle": 30
+    },
+    {
+     "t": 3.2,
+     "angle": 30
+    }
+   ],
+   "lower_arm_r": [
+    {
+     "t": 0,
+     "angle": 75
+    },
+    {
+     "t": 1.4,
+     "angle": 75
+    },
+    {
+     "t": 1.9,
+     "angle": 35
+    },
+    {
+     "t": 2.4,
+     "angle": 75
+    },
+    {
+     "t": 3.2,
+     "angle": 75
+    }
+   ],
+   "head": [
+    {
+     "t": 0,
+     "angle": -6
+    },
+    {
+     "t": 1.6,
+     "angle": -10
+    },
+    {
+     "t": 3.2,
+     "angle": -6
+    }
+   ]
+  },
+  "views": {
+   "front": {
+    "tracks": {
+     "lower_leg_l": [
+      {
+       "t": 0,
+       "angle": -8.4,
+       "sy": 2.25,
+       "x": 2,
+       "y": -81.2
+      }
+     ],
+     "upper_leg_r": [
+      {
+       "t": 0,
+       "angle": -0.7,
+       "sy": 0.5
+      }
+     ],
+     "upper_leg_l": [
+      {
+       "t": 0,
+       "angle": 1.5,
+       "sy": 0.5
+      }
+     ],
+     "lower_leg_r": [
+      {
+       "t": 0,
+       "angle": 9.6,
+       "sy": 2.25,
+       "x": -2,
+       "y": -81.2
+      }
+     ]
+    }
+   }
+  }
+ },
  "lounge": {
   "duration": 2.4,
   "loop": true,

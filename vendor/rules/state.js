@@ -98,7 +98,7 @@ const PRESENCE_NOTE = "出門一下，晚點回來。";
 const HOME_BODY_KINDS = new Set([
     "place", "move", "flip", "store", "wear", "dress", "dye_clothes", "open_door", "close_door", "say_guests", "paint_furniture", "wash", "cook", "eat", "pet", "feed", "dress_dog",
     "toggle", "tv_channel", "read", "shelve", "water", "put_on_table", "take_from_table", "give", "hug", "kiss", "call", "answer_invite", "sleep", "wake", "throw_ball", "throw_pillow",
-    "walk", "wave", "build_room", "decorate_room", "go_street", "go_home",
+    "walk", "wave", "play_cards", "build_room", "decorate_room", "lock_room", "go_street", "go_home",
     "enter_inn", "choose_bath", "soak", "leave_pool", "leave_bath", "leave_inn", "pet_cat", "drink_milk",
 ]);
 /** 人在街上、店裡、旅館時還做得了的事（其餘家裡的事要先回到屋裡）。 */
@@ -178,7 +178,7 @@ const TWEAK_WINDOW_MS = 2 * 60_000;
  *  個別結果可以用 Reduced.tier 覆寫，例如第一次做出某商品、服務人次里程碑、雙人三消輪到誰。 */
 const DIGEST_KINDS = new Set([
     "workshop_move", "craft", "serve", "customer_leave", "wear", "place", "move", "flip", "store", "read", "shelve", "toggle", "tv_channel", "water",
-    "buy", "sell_furniture", "buy_clothes", "sell_clothes", "grant", "take_from_table", "throw_ball", "pet", "feed", "puzzle_start", "puzzle_swap", "shop_open", "keep_clothes", "pet_cat",
+    "buy", "sell_furniture", "buy_clothes", "sell_clothes", "restock", "grant", "take_from_table", "throw_ball", "pet", "feed", "puzzle_start", "puzzle_swap", "shop_open", "keep_clothes", "pet_cat",
 ]);
 function reduce(state, action, context) {
     const { furniture, recipes, clothes, pets, fortunes } = context.content;
@@ -257,6 +257,19 @@ function reduce(state, action, context) {
             if (state.money < spec.price)
                 throw new Error(`錢不夠：${spec.label}要 ${spec.price}，現在有 ${state.money}。`);
             return { state: { ...state, money: state.money - spec.price, wardrobe: adjust(state.wardrobe, action.item, 1) }, note: `花 ${spec.price} 買了${spec.label}` };
+        }
+        case "restock": {
+            const recipe = recipes[action.chain];
+            if (!recipe)
+                throw new Error(`沒有「${action.chain}」這種材料。`);
+            if (!isIngredient(recipe))
+                throw new Error(`${recipe.label}是布料，不是食材，進不了貨。`);
+            if (!Number.isInteger(action.count) || action.count < 1)
+                throw new Error("數量要是正整數。");
+            const cost = restockPrice(recipe) * action.count;
+            if (state.money < cost)
+                throw new Error(`錢不夠：${recipe.label}×${action.count} 要 ${cost}，現在有 ${state.money}。`);
+            return { state: { ...state, money: state.money - cost, materials: adjust(state.materials, action.chain, action.count) }, note: `花 ${cost} 進了${recipe.label}×${action.count}` };
         }
         case "sell_clothes": {
             const spec = clothes[action.item];
@@ -680,6 +693,16 @@ function reduce(state, action, context) {
             const message = { id: context.newId(), at: context.now().toISOString(), speaker: context.actor, name: ACTOR_NAME[context.actor], text };
             return { state: { ...state, guestChat: [...(state.guestChat ?? []), message].slice(-CHAT_LIMIT) }, note: null };
         }
+        case "delete_guest_message": {
+            if (context.actor === "game")
+                throw new Error("小屋自己不收回話。");
+            const message = (state.guestChat ?? []).find((candidate) => candidate.id === action.id);
+            if (!message)
+                throw new Error("客人聊天室裡沒有這則。");
+            if (message.speaker !== "atone" && message.speaker !== "tsunu")
+                throw new Error(`那是${message.name}說的，只能收回屋主自己說的話。`);
+            return { state: { ...state, guestChat: state.guestChat.filter((candidate) => candidate.id !== action.id) }, note: null };
+        }
         case "journal": {
             if (!action.text.trim())
                 throw new Error("日誌內容不可空白。");
@@ -701,6 +724,11 @@ function reduce(state, action, context) {
                 throw new Error("小屋自己不揮手。");
             return { state, note: "揮了揮手" };
         }
+        case "play_cards": {
+            if (context.actor === "game")
+                throw new Error("小屋自己不打牌。");
+            return startCardGame(state, furniture, context.actor, context.now());
+        }
         case "wash": {
             if (context.actor === "game")
                 throw new Error("小屋自己不刷牙。");
@@ -709,8 +737,8 @@ function reduce(state, action, context) {
             const { basin, verb } = washAt(room, here, action.what, furniture);
             if (!action.together)
                 return { state, note: verb };
-            if (state.door?.open)
-                throw new Error(`有客人在，先不要一起${verb}。`);
+            if (!inPrivate(state, context.content))
+                throw new Error(`${NOT_PRIVATE}一起${verb}${PRIVATE_HINT}。`);
             const partner = context.actor === "atone" ? "tsunu" : "atone";
             if (!isHome(state, partner))
                 throw new Error(`${ACTOR_NAME[partner]}不在家。`);
@@ -725,14 +753,14 @@ function reduce(state, action, context) {
             if (context.actor === "game")
                 throw new Error("小屋自己不煮飯。");
             const { materials, dish } = cookDish(state, context.content, standingSpot(state, context), action.dish);
-            return { state: { ...state, materials, dishes: adjust(state.dishes, action.dish, 1) }, note: `煮了一份${dish.label}` };
+            return { state: { ...state, materials, dishes: adjust(state.dishes, action.dish, 1) }, note: `${cookVerb(dish)}了一份${dish.label}` };
         }
         case "eat": {
             if (context.actor === "game")
                 throw new Error("小屋自己不吃飯。");
             const dish = context.content.dishes[action.dish];
             if (!dish || (state.dishes[action.dish] ?? 0) < 1)
-                throw new Error(`沒有${dish?.label ?? action.dish}可以吃，先去爐台煮一份。`);
+                throw new Error(`沒有${dish?.label ?? action.dish}可以吃，先去${dish && dishStation(dish) === "bar" ? "中島泡" : "爐台煮"}一份。`);
             const dishes = adjust(state.dishes, action.dish, -1);
             const stamina = context.actor === "atone" ? fedStamina(state, dish.stamina, context) : state.stamina;
             return { state: { ...state, dishes, stamina }, note: `吃了一份${dish.label}` };
@@ -835,8 +863,8 @@ function reduce(state, action, context) {
             if (!isHome(state, target))
                 throw new Error(`${ACTOR_NAME[target]}不在家。`);
             assertHostInside(state, target);
-            if (state.door?.open)
-                throw new Error("有客人在，先不要抱抱、親親。");
+            if (!inPrivate(state, context.content))
+                throw new Error(`${NOT_PRIVATE}抱抱、親親${PRIVATE_HINT}。`);
             const behind = action.kind === "hug" && action.from === "behind";
             const verb = action.kind === "kiss" ? "親了一下" : behind ? "從後面抱住" : "抱住";
             const note = `${verb}${ACTOR_NAME[target]}`;
@@ -896,8 +924,8 @@ function reduce(state, action, context) {
                 throw new Error("已經在睡了。");
             if (state.sleeping && !together)
                 throw new Error(`${ACTOR_NAME[state.sleeping.alone]}在別張床上睡。`);
-            if (together && state.door?.open)
-                throw new Error("有客人在，先不要一起睡。");
+            if (together && !inPrivate(state, context.content))
+                throw new Error(`${NOT_PRIVATE}一起睡${PRIVATE_HINT}。`);
             if (together) { // 床上抱著時一起睡：變成抱著睡
                 const cuddledBy = state.cuddle ? { cuddledBy: state.cuddle.by } : {};
                 const note = state.sleeping ? `躺到${ACTOR_NAME[state.sleeping.alone]}旁邊一起睡了` : state.cuddle ? "抱著一起睡了" : "兩個人一起睡了";
@@ -1061,6 +1089,8 @@ function reduce(state, action, context) {
             if (isOutside(from))
                 throw new Error("要先回到屋裡。");
             const room = findRoom(state, roomId);
+            if (roomId !== from)
+                assertMayEnter(state, context.content, roomId, context.actor);
             const tapped = { x: action.x, y: action.y };
             assertWalkable(room, tapped, furniture);
             const seat = seatAt(room, tapped, furniture);
@@ -1073,8 +1103,8 @@ function reduce(state, action, context) {
             const moved = roomId !== from ? `走到${room.name}` : null;
             const pose = seat ? furniture[seat.item]?.seatPose : undefined;
             const together = pose === "bathe" && other.room === roomId && seatAt(room, other, furniture)?.id === seat.id;
-            if (together && state.door?.open)
-                throw new Error("有客人在，先不要一起泡澡。");
+            if (together && !inPrivate(state, context.content))
+                throw new Error(`${NOT_PRIVATE}一起泡澡${PRIVATE_HINT}。`);
             const toilet = !!seat && !!furniture[seat.item]?.toilet;
             if (toilet && ((other.room === roomId && seatAt(room, other, furniture)?.id === seat.id) || visitorOnSeat(state, room, roomId, seat, furniture)))
                 throw new Error("馬桶有人在用，等一下。");
@@ -1125,21 +1155,16 @@ function reduce(state, action, context) {
                 throw new Error("小屋自己不裝潢。");
             const roomId = action.room ?? standingSpot(state, context).room;
             const room = findRoom(state, roomId);
-            const { floors, walls } = context.content.surfaces;
-            const floor = action.floor === undefined ? undefined : floors[action.floor];
-            const wall = action.wall === undefined ? undefined : walls[action.wall];
-            if (!floor && !wall)
-                throw new Error(`要換哪種地板或壁紙？地板有 ${Object.keys(floors).join("、")}；壁紙有 ${Object.keys(walls).join("、")}。`);
-            if (floor && action.floor === (room.floor ?? DEFAULT_FLOOR))
-                throw new Error(`${room.name}已經是${floor.label}了。`);
-            if (wall && action.wall === (room.wall ?? DEFAULT_WALL))
-                throw new Error(`${room.name}已經是${wall.label}了。`);
-            const cost = (floor?.price ?? 0) + (wall?.price ?? 0);
+            const { decorated, cost, what } = redecorate(room, context.content, action);
             if (state.money < cost)
                 throw new Error(`錢不夠：要 ${cost}，現在有 ${state.money}。`);
-            const decorated = { ...room, ...(floor ? { floor: action.floor } : {}), ...(wall ? { wall: action.wall } : {}) };
-            const what = [floor && `地板換成${floor.label}`, wall && `壁紙換成${wall.label}`].filter(Boolean).join("、");
             return { state: { ...state, money: state.money - cost, rooms: { ...state.rooms, [roomId]: decorated } }, note: `把${room.name}的${what}${cost ? `（花了 ${cost}）` : ""}` };
+        }
+        case "lock_room": {
+            if (context.actor === "game")
+                throw new Error("小屋自己不鎖門。");
+            const roomId = action.room ?? standingSpot(state, context).room;
+            return lockRoom(state, context.content, roomId, action.locked, context.actor);
         }
         case "buy_decor":
         case "set_decor": {
@@ -1510,14 +1535,17 @@ export function tableItemAt(state, id, index) {
 export function setTableItems(state, piece, items) {
     return replacePlaced(state, { ...piece, items: [...items] });
 }
+/** 這張桌面放得下幾樣：目錄有寫就照目錄（長餐桌），沒寫用預設。 */
+export const tableSlots = (spec) => spec.slots ?? TABLE_SLOTS;
 /** 把一樣東西放到桌上：要是能放東西的家具、還有空位。 */
 export function putOnTable(state, catalog, id, item) {
     const { piece } = findPlaced(state, id);
     if (!catalog[piece.item]?.table)
         throw new Error(`${furnitureLabel(catalog, piece.item)}上放不了東西。`);
     const items = piece.items ?? [];
-    if (items.length >= TABLE_SLOTS)
-        throw new Error(`${furnitureLabel(catalog, piece.item)}上滿了，最多放 ${TABLE_SLOTS} 樣。`);
+    const slots = tableSlots(catalog[piece.item]);
+    if (items.length >= slots)
+        throw new Error(`${furnitureLabel(catalog, piece.item)}上滿了，最多放 ${slots} 樣。`);
     return setTableItems(state, piece, [...items, item]);
 }
 /** 訪客手上的東西收回去（離開、關門時）：桌上拿的放回原本的桌子（桌子收掉了或滿了就算吃掉了），屋主遞的回到家裡的庫存。 */
@@ -1546,20 +1574,34 @@ function cookName(item) {
 }
 /** 煮家常菜的共用規則（阿童、阿宇煮進家裡的菜，客人煮的拿在手上）：要站在爐台旁、家裡的材料要夠；回傳扣掉材料後的材料與這道菜。
  *  showCounts：材料不夠時要不要把數量寫進訊息（客人看不到家裡的材料數）。 */
+/** 進得了貨的材料：食材類（布料鏈做的是衣服，不算）。 */
+export function isIngredient(recipe) {
+    return !recipe.clothes;
+}
+/** 進貨單價：做一份商品要 2^(階數−1) 個材料，拿商品價平分到每個材料再加五成運費。
+ *  買材料做商品一定虧（蛋 4×14＝56 > 茶葉蛋 35），所以進貨補得了冰箱、取代不了三消。 */
+export function restockPrice(recipe) {
+    return Math.ceil(recipe.price / 2 ** (recipe.tiers.length - 1) * 1.5);
+}
 export function cookDish(state, content, spot, dishId, showCounts = true) {
     const dish = content.dishes[dishId];
     if (!dish)
         throw new Error(`不會煮「${dishId}」。`);
-    if (!pieceNextTo(findRoom(state, spot.room), spot, content.furniture, (spec) => !!spec.stove))
-        throw new Error("要先走到爐台前。");
+    const atBar = dishStation(dish) === "bar";
+    if (!pieceNextTo(findRoom(state, spot.room), spot, content.furniture, (spec) => (atBar ? !!spec.bar : !!spec.stove)))
+        throw new Error(atBar ? "要先走到中島或櫥櫃前。" : "要先走到爐台前。");
     const missing = Object.entries(dish.ingredients).filter(([chain, need]) => (state.materials[chain] ?? 0) < need);
     if (missing.length && !showCounts)
-        throw new Error(`材料不夠，煮不了${dish.label}。`);
+        throw new Error(`材料不夠，${cookVerb(dish)}不了${dish.label}。`);
     if (missing.length)
         throw new Error(`材料不夠：${missing.map(([chain, need]) => `${content.recipes[chain]?.label ?? chain}要 ${need} 個（有 ${state.materials[chain] ?? 0}）`).join("、")}。`);
     const materials = Object.entries(dish.ingredients).reduce((have, [chain, need]) => adjust(have, chain, -need), state.materials);
     return { materials, dish };
 }
+/** 這道在哪種家具旁做：爐台煮（預設）、飲料吧（中島、櫥櫃）泡。 */
+export const dishStation = (dish) => dish.station ?? "stove";
+/** 做這道菜的動詞：爐台的煮、飲料吧的泡。 */
+export const cookVerb = (dish) => (dishStation(dish) === "bar" ? "泡" : "煮");
 /** 現在家裡的材料夠煮的菜（id）。 */
 export function cookableDishes(state, content) {
     return Object.entries(content.dishes).filter(([, dish]) => Object.entries(dish.ingredients).every(([chain, need]) => (state.materials[chain] ?? 0) >= need)).map(([id]) => id);
@@ -1802,6 +1844,45 @@ function pieceNextTo(room, cell, catalog, wanted) {
     const near = new Set(besideCells(cell).map((c) => `${c.x},${c.y}`));
     return room.placed.find((p) => catalog[p.item] && wanted(catalog[p.item]) && occupiedCells(p, catalog).some((key) => near.has(key))) ?? null;
 }
+/** 打一局牌多久：這段時間裡坐在桌旁的人都在打，同桌再按一次打牌重新算。 */
+export const CARD_GAME_MS = 30 * 60_000;
+/** 想真的打一場時去的地方：Agent Table（人類與 AI 一起打牌的牌桌）大廳；網頁動作列那顆連結的網址在 web/room-view.js。 */
+export const AGENT_TABLE_LOBBY = "https://game-table.atone.idv.tw/";
+/** 坐在 cell 的人面前那張牌桌：坐在一般座位（不是床、浴缸）上、緊鄰的桌子檯面上疊著牌組或麻將組；沒有就 null。 */
+export function cardTableAt(room, cell, catalog) {
+    const seat = seatAt(room, cell, catalog);
+    if (!seat || (catalog[seat.item]?.seatPose ?? "sit") !== "sit")
+        return null;
+    const near = new Set(besideCells(cell).map(cellKey));
+    for (const table of room.placed) {
+        if (!catalog[table.item]?.table || !occupiedCells(table, catalog).some((key) => near.has(key)))
+            continue;
+        const set = stackedOn(room, table, catalog).find((piece) => catalog[piece.item]?.cards);
+        if (set)
+            return { table, set };
+    }
+    return null;
+}
+/** 這組牌正在打：有人按過打牌、還沒過 CARD_GAME_MS。 */
+export const cardGameOn = (set, now) => !!set.playing && now.getTime() - Date.parse(set.playing) < CARD_GAME_MS;
+/** 坐在這張牌桌旁的人（在屋裡的屋主與訪客）：atone、tsunu 或訪客 id。 */
+export function cardPlayers(state, roomId, table, catalog) {
+    const room = findRoom(state, roomId);
+    const atTable = (spot) => spot.room === roomId && cardTableAt(room, spot, catalog)?.table.id === table.id;
+    const hosts = ["atone", "tsunu"].filter((who) => isHome(state, who) && atTable(state.positions[who]));
+    return [...hosts, ...Object.entries(state.visitors ?? {}).filter(([, visitor]) => atTable(visitor.spot)).map(([id]) => id)];
+}
+/** who（atone、tsunu 或訪客 id）在坐著的桌旁開打：那組牌記下開打時間，同桌坐著的人一起打；note 不含主詞。 */
+export function startCardGame(state, catalog, who, now) {
+    const spot = who === "atone" || who === "tsunu" ? state.positions[who] : state.visitors?.[who]?.spot;
+    const at = spot && !isOutside(spot.room) ? cardTableAt(findRoom(state, spot.room), spot, catalog) : null;
+    if (!spot || !at)
+        throw new Error("要先坐到放著牌組或麻將組的桌子旁邊。");
+    const label = catalog[at.set.item]?.label ?? at.set.item;
+    const others = cardPlayers(state, spot.room, at.table, catalog).filter((id) => id !== who).map((id) => personName(state, id));
+    const next = replacePlaced(state, { ...at.set, playing: now.toISOString() });
+    return { state: next, note: others.length ? `拿出${label}，跟${others.join("、")}打起牌` : `拿出${label}，一個人玩了起來` };
+}
 /** 阿童吃了東西：體力回 amount 點（不超過上限）。 */
 function fedStamina(state, amount, context) {
     return eatenStamina(state, amount, context.content.settings, context.now());
@@ -1940,6 +2021,88 @@ function everyoneSpots(state, except) {
 // ---------- 客房：客人登記一間、同住、長住；屋主替客人登記也走同一套 ----------
 const GUEST_ROOM_FULL = "客房都有人了，等有人退房再來。";
 export const isGuestRoom = (state, content, roomId) => content.rooms[state.rooms[roomId]?.kind ?? ""]?.guest === true;
+// ---------- 鎖門：能鎖的房間（目錄 lockable）誰有鑰匙就看房間是誰的 ----------
+/** 這間房的鑰匙在誰手上：客房是登記的人和同住的人，其他能鎖的房間（房東房間）是屋主。 */
+export function keyholders(state, content, roomId) {
+    if (isGuestRoom(state, content, roomId)) {
+        const lodging = state.guestRooms?.[roomId];
+        return new Set(lodging ? [lodging.holder, ...lodging.lodgers] : []);
+    }
+    return new Set(["atone", "tsunu"]);
+}
+export const hasKey = (state, content, roomId, who) => keyholders(state, content, roomId).has(who);
+/** 兩個人現在有沒有私人空間：門關著就有；門開著時要兩個人都在同一間鎖著、鑰匙在屋主手上的房間（房東房間）裡，而且房裡沒有客人。 */
+export function inPrivate(state, content) {
+    if (!state.door?.open)
+        return true;
+    const here = state.positions.atone.room;
+    if (!isHome(state, "atone") || !isHome(state, "tsunu") || state.positions.tsunu.room !== here)
+        return false;
+    if (!state.rooms[here]?.locked || !hasKey(state, content, here, "atone") || !hasKey(state, content, here, "tsunu"))
+        return false;
+    return !Object.values(state.visitors ?? {}).some((visitor) => visitor.spot.room === here);
+}
+const NOT_PRIVATE = "有客人在，先不要";
+const PRIVATE_HINT = "（兩個人進房東房間或私人衛浴把門鎖上就可以）";
+/** 鎖著的房間只有拿鑰匙的人進得去：任何人走進別間房前都過這一關（房東房間、客房休息中）。 */
+export function assertMayEnter(state, content, roomId, who) {
+    const room = state.rooms[roomId];
+    if (room?.locked && !hasKey(state, content, roomId, who))
+        throw new Error(`${room.name}休息中，門鎖著。`);
+}
+/** 鎖上或打開一間房：要能鎖、by 要有鑰匙；鎖上時沒鑰匙的人（客人、屋主）都請到門外那間房的門口。 */
+export function lockRoom(state, content, roomId, locked, by) {
+    const room = findRoom(state, roomId);
+    const catalog = content.furniture;
+    if (!content.rooms[room.kind]?.lockable)
+        throw new Error(`${room.name}沒有鎖。`);
+    if (!hasKey(state, content, roomId, by))
+        throw new Error(isGuestRoom(state, content, roomId) ? `${room.name}的鑰匙在房客手上，${state.guestRooms?.[roomId] ? "不是你的房間" : "沒人登記的客房鎖不了"}。` : `${room.name}的鑰匙在屋主手上。`);
+    if (!!room.locked === locked)
+        throw new Error(`${room.name}${locked ? "已經鎖著了" : "本來就開著"}。`);
+    const rooms = { ...state.rooms, [roomId]: { ...room, locked } };
+    if (!locked) { // 門開著時私人空間只靠這道鎖：開鎖就鬆開抱抱、一起睡的起床
+        const exposed = !!state.door?.open && inPrivate(state, content) && state.positions.atone.room === roomId;
+        const opened = exposed ? { ...withoutCuddle(state), sleeping: state.sleeping && !state.sleeping.alone ? null : state.sleeping } : state;
+        return { state: { ...opened, rooms }, note: `把${room.name}的門打開了` };
+    }
+    const keys = keyholders(state, content, roomId);
+    const outside = room.doors[0];
+    const hallway = outside ? findRoom(state, outside.to) : null;
+    const hallwayDoor = hallway?.doors.find((door) => door.to === roomId);
+    const shownOut = [];
+    let next = { ...state, rooms };
+    const escort = (id, name) => {
+        if (!hallway || !hallwayDoor)
+            throw new Error(`${room.name}裡還有${name}，門外又沒地方站。`);
+        const [spot] = freeCellsNear(next, outside.to, doorCell(hallwayDoor), catalog, peopleSpots(next, id));
+        if (!spot)
+            throw new Error(`${hallway.name}擠不下了，請不出${name}。`);
+        shownOut.push(name);
+        return spot;
+    };
+    for (const host of ["atone", "tsunu"]) {
+        if (keys.has(host) || !isHome(next, host) || next.positions[host].room !== roomId)
+            continue;
+        const spot = escort(host, ACTOR_NAME[host]);
+        next = { ...next, positions: { ...next.positions, [host]: spot }, sleeping: next.sleeping?.alone === host || (next.sleeping && !next.sleeping.alone) ? null : next.sleeping };
+    }
+    for (const [id, visitor] of Object.entries(next.visitors ?? {})) {
+        if (keys.has(id) || visitor.spot.room !== roomId)
+            continue;
+        const spot = escort(id, visitor.name);
+        const { asleep: _asleep, ...awake } = visitor;
+        next = { ...next, visitors: { ...next.visitors, [id]: { ...awake, spot } } };
+    }
+    return { state: next, note: `把${room.name}鎖上了${shownOut.length ? `（請${shownOut.join("、")}到${hallway.name}）` : ""}` };
+}
+/** 房間的鎖打開（清房時用：房客走了，鎖不能留著）。 */
+function unlocked(state, roomId) {
+    const room = state.rooms[roomId];
+    if (!room?.locked)
+        return state;
+    return { ...state, rooms: { ...state.rooms, [roomId]: { ...room, locked: false } } };
+}
 /** 這位客人登記（或同住）的客房；沒有就 null。 */
 export function lodgingOf(state, visitorId) {
     for (const [roomId, lodging] of Object.entries(state.guestRooms ?? {})) {
@@ -2007,7 +2170,7 @@ export function checkOut(state, visitorId) {
 export function clearLodging(state, roomId) {
     const { [roomId]: gone, ...rest } = state.guestRooms ?? {};
     const stored = gone ? storeLayout(state, roomId, gone.holder) : state;
-    return { ...stored, guestRooms: rest };
+    return unlocked({ ...stored, guestRooms: rest }, roomId);
 }
 function withLodging(state, roomId, lodging) {
     return { ...state, guestRooms: { ...state.guestRooms, [roomId]: lodging } };
@@ -2147,11 +2310,36 @@ function turned(piece, spec) {
         return { ...piece, flip: !piece.flip, back: piece.flip ? !piece.back : !!piece.back };
     return { ...piece, flip: !piece.flip };
 }
-/** 客人要動家具時：他登記（或同住）的客房與那間的登記人；人要站在那間房裡。 */
-function guestRoomFor(state, id, spot) {
+/** 一間房換地板或壁紙：挑的樣式要存在、跟現在的不同；回傳換好的房間、總價、日誌用的描述。屋主花家裡的錢、房客花錢包，付錢各自處理。 */
+export function redecorate(room, content, change) {
+    const { floors, walls } = content.surfaces;
+    const floor = change.floor === undefined ? undefined : floors[change.floor];
+    const wall = change.wall === undefined ? undefined : walls[change.wall];
+    if (!floor && !wall)
+        throw new Error(`要換哪種地板或壁紙？地板有 ${Object.keys(floors).join("、")}；壁紙有 ${Object.keys(walls).join("、")}。`);
+    if (floor && change.floor === (room.floor ?? DEFAULT_FLOOR))
+        throw new Error(`${room.name}已經是${floor.label}了。`);
+    if (wall && change.wall === (room.wall ?? DEFAULT_WALL))
+        throw new Error(`${room.name}已經是${wall.label}了。`);
+    const decorated = { ...room, ...(floor ? { floor: change.floor } : {}), ...(wall ? { wall: change.wall } : {}) };
+    const what = [floor && `地板換成${floor.label}`, wall && `壁紙換成${wall.label}`].filter(Boolean).join("、");
+    return { decorated, cost: (floor?.price ?? 0) + (wall?.price ?? 0), what };
+}
+/** 房客裝潢自己的客房：登記的人和同住的人都能換，人要站在那間房裡，從自己的錢包付（價目跟屋主同一份）。換好的樣式留在房間裡，退房不收回。 */
+export function decorateGuestRoom(state, content, id, spot, change) {
+    const { roomId } = guestRoomFor(state, id, spot, "裝潢");
+    const room = findRoom(state, roomId);
+    const { decorated, cost, what } = redecorate(room, content, change);
+    const mine = walletOf(state, id);
+    if (mine < cost)
+        throw new Error(`錢不夠：要 ${cost}，你有 ${mine}。`);
+    return { state: withWallet({ ...state, rooms: { ...state.rooms, [roomId]: decorated } }, id, mine - cost), note: `把${room.name}的${what}${cost ? `（花了 ${cost}）` : ""}` };
+}
+/** 客人要動家具、裝潢時：他登記（或同住）的客房與那間的登記人；人要站在那間房裡。 */
+function guestRoomFor(state, id, spot, purpose = "擺自己的家具") {
     const found = lodgingOf(state, id);
     if (!found)
-        throw new Error("先登記一間客房，才能擺自己的家具。");
+        throw new Error(`先登記一間客房，才能${purpose}。`);
     if (spot.room !== found.roomId)
         throw new Error(`要先走到${findRoom(state, found.roomId).name}。`);
     return { roomId: found.roomId, holder: found.lodging.holder };

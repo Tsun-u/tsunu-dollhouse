@@ -28,7 +28,8 @@
    "y": 664,
    "width": 354
   },
-  "table": true
+  "table": true,
+  "bar": true
  },
  "bath_mat": {
   "label": "腳踏墊",
@@ -69,7 +70,8 @@
    "y": 900,
    "width": 384
   },
-  "table": true
+  "table": true,
+  "bar": true
  },
  "kitchen_counter": {
   "label": "流理台",
@@ -155,7 +157,9 @@
   "price": 240,
   "image": "assets/furniture/sofa.png",
   "imageAlongDepth": true,
-  "seat": true
+  "seat": true,
+  "dye": true,
+  "dyeValue": 0.7
  },
  "table": {
   "label": "小桌",
@@ -276,6 +280,7 @@
  },
  "bed_double": {
   "label": "雙人床",
+  "double": true,
   "dogNap": true,
   "w": 3,
   "d": 3,
@@ -443,6 +448,39 @@
    "sitShift": -12
   },
   "dye": true
+ },
+ "long_table": {
+  "label": "長餐桌",
+  "w": 4,
+  "d": 2,
+  "height": 0.8,
+  "color": "#b98a52",
+  "price": 720,
+  "table": true,
+  "slots": 6,
+  "image": "assets/furniture/long_table.png",
+  "anchor": {
+   "x": 651,
+   "y": 815,
+   "width": 763
+  }
+ },
+ "bar_stool": {
+  "label": "吧台椅",
+  "w": 1,
+  "d": 1,
+  "height": 1.0,
+  "color": "#c89a5a",
+  "price": 110,
+  "image": "assets/furniture/bar_stool.png",
+  "seat": true,
+  "size": 0.68,
+  "sitDrop": -14,
+  "anchor": {
+   "x": 511,
+   "y": 701,
+   "width": 255
+  }
  },
  "coffee_table": {
   "label": "茶几",

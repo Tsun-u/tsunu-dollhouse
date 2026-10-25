@@ -393,3 +393,5 @@ h2.section[hidden] { display: none; }
 .icon-btn.go-make { border-color: #f2c46d; background: #fff7d6; animation: nudge 1.6s ease-in-out infinite; }
 @keyframes nudge { 0%, 70%, 100% { transform: none; } 80% { transform: translateY(-4px); } 90% { transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .icon-btn.go-make { animation: none; } }
+.icon-btn.place-turn { align-self: center; justify-self: center; }
+.icon-btn.place-turn.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); background: #fff4ea; }

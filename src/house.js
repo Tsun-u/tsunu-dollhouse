@@ -8,6 +8,7 @@ import { Pets } from "../vendor/web/pets.js";
 import { RoomView } from "../vendor/web/room-view.js";
 import { swatchRow } from "../vendor/web/swatches.js";
 import { trimmedImage } from "./thumbs.js";
+import { iconButton } from "./ui.js";
 
 const $ = (id) => document.getElementById(id);
 const WAVE_MS = 3200;
@@ -36,6 +37,7 @@ export class House {
     this.deps = deps;
     this.people = new Map();   // 娃娃 id → 畫面上的人物（位置、路徑、動畫）
     this.pendingItem = null;   // 倉庫裡選好、等著放進房間的家具
+    this.pendingFlip = false;  // 放下去的時候要不要先轉向
     this.selectedPiece = null;
     this.tappedCell = null;
     this.sleepingOn = null;    // 一起睡的那張床的 id；有人起來就結束
@@ -219,8 +221,9 @@ export class House {
   tapCell(cell) {
     const { apply } = this.deps;
     if (this.pendingItem) {
-      apply({ kind: "place", item: this.pendingItem, x: cell.x, y: cell.y, room: this.roomId });
+      apply({ kind: "place", item: this.pendingItem, x: cell.x, y: cell.y, room: this.roomId, flip: this.pendingFlip });
       this.pendingItem = null;
+      this.pendingFlip = false;
       this.renderInventory();
       return;
     }
@@ -267,9 +270,14 @@ export class House {
         Object.assign(document.createElement("span"), { className: "card-label", textContent: spec.label }),
         Object.assign(document.createElement("span"), { className: "count-badge", textContent: `×${count}` }),
       );
-      card.onclick = () => { this.pendingItem = this.pendingItem === item ? null : item; this.selectPiece(null); this.renderInventory(); };
+      card.onclick = () => { this.pendingItem = this.pendingItem === item ? null : item; this.pendingFlip = false; this.selectPiece(null); this.renderInventory(); };
       return card;
     }));
+    const pending = catalog[this.pendingItem];
+    if (pending && !pending.onWall) {   // 拿著家具時多一顆轉向：亮著就是放下去時轉過方向（掛牆的照點哪面牆決定方向）
+      const turn = iconButton("rotate", "放的時候轉向", () => { this.pendingFlip = !this.pendingFlip; this.renderInventory(); }, "big place-turn" + (this.pendingFlip ? " on" : ""));
+      $("inventory").prepend(turn);
+    }
     $("inventory").previousElementSibling.hidden = $("inventory").hidden = !$("inventory").children.length;   // 倉庫空了就整段收起來
   }
 
@@ -310,17 +318,23 @@ export class House {
         actions.push(button(`跟${other.name}一起刷牙`, () => { this.atPiece(piece, teeth, doll); this.atPiece(piece, teeth, this.dollById(other.id)); }, ""));
       }
     }
-    if (spec?.stove && doll) {   // 爐台：用三消材料煮家常菜，材料不夠的反灰、寫上缺什麼；家裡有煮好的就能吃
+    if ((spec?.stove || spec?.bar) && doll) {   // 爐台煮家常菜、中島櫥櫃泡飲料：用三消材料，材料不夠的反灰、寫上缺什麼；家裡有做好的就能吃喝
       const { dishes, recipes } = this.deps.content;
       const { materials } = this.deps.game.state;
-      for (const [id, dish] of Object.entries(dishes)) {
+      const station = spec.bar ? "bar" : "stove";
+      const [make, use] = spec.bar ? ["泡", "喝"] : ["煮", "吃"];
+      const here = Object.entries(dishes).filter(([, dish]) => (dish.station ?? "stove") === station);
+      for (const [id, dish] of here) {
         const missing = Object.entries(dish.ingredients).filter(([chain, need]) => (materials[chain] ?? 0) < need)
           .map(([chain, need]) => `${recipes[chain]?.label ?? chain} ${need - (materials[chain] ?? 0)}`);
-        const cook = button(missing.length ? `煮${dish.label}（缺${missing.join("、")}）` : `煮${dish.label}`, () => this.atPiece(piece, { kind: "cook", dish: id }), "");
+        const cook = button(missing.length ? `${make}${dish.label}（缺${missing.join("、")}）` : `${make}${dish.label}`, () => this.atPiece(piece, { kind: "cook", dish: id }), "");
         cook.disabled = missing.length > 0;
         actions.push(cook);
       }
-      for (const [id, count] of Object.entries(this.deps.game.state.dishes ?? {})) if (count > 0) actions.push(button(`吃${dishes[id]?.label ?? id}（${count}）`, () => this.act({ kind: "eat", dish: id }), ""));
+      for (const [id] of here) {
+        const count = this.deps.game.state.dishes?.[id] ?? 0;
+        if (count > 0) actions.push(button(`${use}${dishes[id].label}（${count}）`, () => this.act({ kind: "eat", dish: id }), ""));
+      }
     }
     for (const [dog, pet] of Object.entries(this.deps.content.pets)) {
       if (spec?.bowl) actions.push(button(`倒飼料給${pet.label}`, () => this.act({ kind: "feed", dog, food: "meal" }), ""));

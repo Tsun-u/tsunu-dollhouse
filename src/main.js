@@ -4,7 +4,7 @@
 import { paintSwatch } from "../vendor/player/patterns.js";
 import { loadSkeleton, samplePose } from "../vendor/player/player.js";
 import { BODIES, CLOTHES_COLORS, PATTERNS, dyeBase, dyePattern, headParts, randomDye, randomLooks, sameDye, withBase, withPattern, withPatternColor } from "../vendor/rules/looks.js";
-import { SHOP_LABEL, SHOP_RENT } from "../vendor/rules/state.js";
+import { SHOP_LABEL, SHOP_RENT, isIngredient, restockPrice } from "../vendor/rules/state.js";
 import { CafeView } from "../vendor/web/cafe-view.js";
 import { CATEGORY_SLOT, SLOT_LABEL, coversHips, dressUp, dyeable } from "../vendor/web/dress.js";
 import { IconSheet } from "../vendor/web/icons.js";
@@ -317,6 +317,21 @@ function renderShop() {
   $("resaleList").previousElementSibling.hidden = $("resaleList").hidden = !$("resaleList").children.length;
 }
 
+// ───────── 工坊的進貨：花錢買食材（開了的店才有），點兩下買一份 ─────────
+
+function renderRestock() {
+  const { state } = game;
+  const chains = Object.entries(content.recipes).filter(([, recipe]) => isIngredient(recipe) && state.shops[recipe.shop ?? "cafe"]);
+  $("restockList").replaceChildren(...chains.map(([chain, recipe]) => {
+    const picture = Object.assign(document.createElement("span"), { className: "thumb icon" });
+    icons.apply(picture, chain, 0);
+    const owned = state.materials[chain] ?? 0;
+    const cost = restockPrice(recipe);
+    const card = itemCard(picture, recipe.tiers[0], price(cost), ...(owned ? [badge(`×${owned}`)] : []));
+    return payCard(card, `restock:${chain}`, cost, () => apply({ kind: "restock", chain, count: 1 }));
+  }));
+}
+
 // ───────── 咖啡廳 ─────────
 
 /** 正在看的那家店：客人、開關、這家店的商品（服飾店做好的衣服可以收進衣櫃）；街景、三消選店跟著更新。 */
@@ -585,6 +600,7 @@ function renderAll() {
   cafe.setState(game.state);
   renderCafe();
   if (showing("shop")) renderShop();
+  if (showing("workshop")) renderRestock();
   if (showing("closet")) renderCloset();
   if (showing("dolls")) renderDolls();
   renderStatus();

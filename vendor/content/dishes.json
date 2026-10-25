@@ -44,5 +44,33 @@
   },
   "stamina": 1,
   "image": "assets/items/dishes/gummy.png"
+ },
+ "herbal_tea": {
+  "label": "花茶",
+  "ingredients": {
+   "flower": 2
+  },
+  "stamina": 1,
+  "image": "assets/items/dishes/herbal_tea.png",
+  "station": "bar"
+ },
+ "pourover": {
+  "label": "手沖咖啡",
+  "ingredients": {
+   "bean": 2
+  },
+  "stamina": 1,
+  "image": "assets/items/dishes/pourover.png",
+  "station": "bar"
+ },
+ "latte": {
+  "label": "拿鐵",
+  "ingredients": {
+   "bean": 1,
+   "milk": 1
+  },
+  "stamina": 1,
+  "image": "assets/items/dishes/latte.png",
+  "station": "bar"
  }
 }

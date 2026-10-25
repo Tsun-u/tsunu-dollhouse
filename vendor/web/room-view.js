@@ -38,7 +38,7 @@ const CUDDLE_GAP = 0.25;   // 抱抱、親親時發起的人離對方幾格（�
 const BED_SIDE_HUG = { gap: 0.5, nearLean: 6, farLean: -6, farHead: 6 };   // 床上並肩側抱：兩人沿床寬相距幾格；靠鏡頭的人往對方傾、離鏡頭的人後仰並把頭偏過來
 const BED_BACK_HUG = { backLean: 8, frontLean: -4, frontForward: 0.3, backTowardCamera: 0.1, kissFrontLean: 8 };   // 床上圈抱：後面的人往前彎、前面的人往後靠；前面的人往床尾挪幾格、後面的人往鏡頭偏幾格；圈抱著親親時前面的人改成往前彎
 const BED_SIDE_KISS = { tilt: 12, gapTallNear: 12, gapTallFar: 16 };   // 床上並肩親親：高的低頭、矮的抬頭幾度；兩人臀部同高，左右相距幾 px（高的坐靠鏡頭那側時近一點）
-const SEATED_ANIMS = new Set(["sit", "lounge", "lounge_side_hug", "lounge_back_hug", "lounge_back_held", "lounge_back_hug_kiss", "lounge_back_held_kiss", "lounge_turned", "sleep", "sleep_hug", "shower"]);   // 人在家具上（坐著、靠著、躺著）
+const SEATED_ANIMS = new Set(["sit", "cards", "lounge", "lounge_side_hug", "lounge_back_hug", "lounge_back_held", "lounge_back_hug_kiss", "lounge_back_held_kiss", "lounge_turned", "sleep", "sleep_hug", "shower"]);   // 人在家具上（坐著、靠著、躺著）
 const seated = (who) => SEATED_ANIMS.has(who.anim);
 const lying = (who) => who.anim === "sleep" || who.anim === "sleep_hug";
 const heightOf = (who) => who.skeletons[who.view].data.scale ?? 1;   // 身高看骨架檔的 scale
@@ -57,6 +57,19 @@ const SLEEP_HIP_CELLS = 1.3;   // 躺著時臀部離床頭幾格，頭才會落�
 const SLEEP_Z_LIFT = 30;       // 躺著時 z 從腳底往上這麼多畫面像素冒出來
 const DOOR_H = 84, DOOR_INSET = 0.14;   // 門的畫面高度；門框左右各內縮幾成格寬
 const LABEL = { atone: "阿童", tsunu: "阿宇" };
+const FABRIC_VALUE = 0.89;   // 燕麥色布面（扶手椅、三人沙發）的亮度；布面不是燕麥色的家具在目錄寫 dyeValue
+const CARD_GAME_MS = 30 * 60_000;   // 一局牌多久，跟伺服器的 CARD_GAME_MS 一樣
+const AGENT_TABLE_LOBBY = "https://game-table.atone.idv.tw/";   // 想真的打一場：Agent Table 大廳（跟伺服器的 AGENT_TABLE_LOBBY 一樣）
+
+/** 從倉庫擺家具前的「放的時候轉向」：開著時按鈕亮起；長方形的寫出轉向後占幾格（6×4 的地毯轉成 4×6）。 */
+export function flipChip(spec, on, onToggle) {
+  return Object.assign(document.createElement("button"), { type: "button", className: on ? "item on" : "item", textContent: spec.w === spec.d ? "放的時候轉向" : `放的時候轉向（轉成 ${spec.d}×${spec.w}）`, onclick: onToggle });
+}
+
+/** 動作列上「去 Agent Table 大廳」那顆：外觀跟按鈕一樣的連結，開新分頁，小屋留在原本的分頁。 */
+export function agentTableLink() {
+  return Object.assign(document.createElement("a"), { className: "button-link", href: AGENT_TABLE_LOBBY, target: "_blank", rel: "noopener", textContent: "去 Agent Table 大廳" });
+}
 const STILL_ANIMS = new Set(["idle", "sit", "lounge", "sleep"]);   // 只有呼吸起伏的動作：畫好的人像可以重用
 export const STILL_POSE_TOLERANCE = 2;   // 姿勢差不到 2 度、2 個骨架單位（約 0.15 畫面 px）就不重畫；衣櫃的試穿預覽也用它
 const CROWD = 4;                  // 房間裡超過這麼多人：走路的腳步也重用人像
@@ -361,7 +374,7 @@ export class RoomView {
           character.showering = seatPose === "shower";   // 淋浴：站在淋浴盤上洗頭，霧面玻璃擋住身體
           const hostAsleep = this.sleeping && !character.visitor && (!this.sleepAlone || this.sleepAlone === character.name);   // 屋主一個人睡時，另一個坐上床只是坐著
           const asleep = onBed && (hostAsleep || character.asleep);   // 訪客各自睡：角色帶 asleep
-          character.anim = asleep ? (this.sleepCuddler === character.name ? "sleep_hug" : "sleep") : character.bathing ? "sit" : seatPose;
+          character.anim = asleep ? (this.sleepCuddler === character.name ? "sleep_hug" : "sleep") : character.bathing ? "sit" : seatPose === "sit" && this.playingCardsAt(character.pos) ? "cards" : seatPose;
           const away = this.facesAway(seat) || character.bathing;   // 背對鏡頭的椅子與浴缸：坐上去是背影，朝左上＝沿 −x、朝右上＝沿 −y
           character.view = lying(character) || away ? "back34" : "front34";   // 睡覺背對鏡頭側睡，不用畫閉眼
           character.flip = onBed ? this.bedAxis(seat) === "x" : this.imageMirrored(seat) === away;   // 斜前視角朝右下＝沿 x，朝左下＝沿 y
@@ -670,10 +683,10 @@ export class RoomView {
     const fabric = pixelsOf(mask).pixels.data;
     const data = pixels.data;
     const target = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
-    const FABRIC_VALUE = 0.89;   // 燕麥色布面的亮度：比它亮的地方（打光）染得更亮、暗的（陰影）染得更暗
+    const fabricValue = this.catalog[key.split(":")[0]]?.dyeValue ?? FABRIC_VALUE;   // 比布面原本亮的地方（打光）染得更亮、暗的（陰影）染得更暗
     for (let i = 0; i < data.length; i += 4) {
       if (!fabric[i + 3]) continue;
-      const shade = Math.max(data[i], data[i + 1], data[i + 2]) / 255 / FABRIC_VALUE;
+      const shade = Math.max(data[i], data[i + 1], data[i + 2]) / 255 / fabricValue;
       for (let c = 0; c < 3; c++) data[i + c] = Math.min(255, target[c] * shade);
     }
     ctx.putImageData(pixels, 0, 0);
@@ -830,6 +843,22 @@ export class RoomView {
     return this.home.placed.find((p) => p.id !== piece.id && bases.includes(p.item) && cells.every((cell) => this.cellsOf(p).includes(cell))) ?? null;
   }
 
+  /** 坐在 cell 的人面前那組牌（牌組、麻將組）：坐在一般座位上、緊鄰的桌子檯面上疊著的那組；沒有就 null。跟伺服器的 cardTableAt 同一套判斷。 */
+  cardSetAt(cell) {
+    const seat = this.seatAt(cell);
+    if (!seat || (this.catalog[seat.item].seatPose ?? "sit") !== "sit") return null;
+    const x = Math.round(cell.x), y = Math.round(cell.y);
+    const near = new Set([`${x + 1},${y}`, `${x - 1},${y}`, `${x},${y + 1}`, `${x},${y - 1}`]);
+    const tables = this.home.placed.filter((piece) => this.catalog[piece.item]?.table && this.cellsOf(piece).some((key) => near.has(key)));
+    return this.home.placed.find((piece) => this.catalog[piece.item]?.cards && tables.includes(this.stackBase(piece))) ?? null;
+  }
+
+  /** 坐在 cell 的人正在打牌：面前那組牌開打還沒過一局的時間。 */
+  playingCardsAt(cell) {
+    const set = this.cardSetAt(cell);
+    return !!set?.playing && Date.now() - Date.parse(set.playing) < CARD_GAME_MS;
+  }
+
   /** 疊在檯面上的東西畫面要抬高多少：底下那件的高度。 */
   liftOf(piece) {
     const base = this.stackBase(piece);
@@ -842,6 +871,12 @@ export class RoomView {
     const cells = [];
     for (let dx = 0; dx < w; dx++) for (let dy = 0; dy < d; dy++) cells.push(`${piece.x + dx},${piece.y + dy}`);
     return cells;
+  }
+
+  /** 家具佔的格子裡離 cell 最近的那格：點到高的家具（沙發背、淋浴間的玻璃）時指到的格子會落在它後面、甚至房間外，要拉回家具上。 */
+  nearestCellOf(piece, cell) {
+    return this.cellsOf(piece).map(parseCell)
+      .sort((a, b) => Math.hypot(a.x - cell.x, a.y - cell.y) - Math.hypot(b.x - cell.x, b.y - cell.y))[0] ?? { x: piece.x, y: piece.y };
   }
 
   /** 家具（洗手台、爐台）旁邊站得進去的格子裡離 from 最近的那格；from 已經緊鄰它就是 from 自己；沒有就 null。 */
@@ -1141,11 +1176,16 @@ export class RoomView {
     if (!items.length || this.catalog[piece.item]?.drawer) return;   // 抽屜裡的東西藏著不畫
     const { ctx } = this;
     const { w, d } = this.footprint(piece);
-    const [sx, sy] = this.toScreen(piece.x + w / 2, piece.y + d / 2);
-    const surface = sy - this.catalog[piece.item].height * UNIT_H;
+    const lift = this.catalog[piece.item].height * UNIT_H;
+    const spotOf = (i) => {   // 方形桌面排成一橫排；長桌（長餐桌、茶几）沿著長邊等距排，轉向了就跟著轉
+      if (w === d) { const [sx, sy] = this.toScreen(piece.x + w / 2, piece.y + d / 2); return [sx + (i - (items.length - 1) / 2) * TABLE_ICON_GAP, sy]; }
+      const t = (i + 0.5) / items.length;
+      return this.toScreen(piece.x + (w > d ? t * w : w / 2), piece.y + (w > d ? d / 2 : t * d));
+    };
     ctx.save();
     items.forEach((item, i) => {
-      const x = sx + (i - (items.length - 1) / 2) * TABLE_ICON_GAP;
+      const [x, sy] = spotOf(i);
+      const surface = sy - lift;
       if (this.drawTableIcon?.(ctx, item, x - TABLE_ICON / 2, surface - TABLE_ICON * 0.8, TABLE_ICON)) return;
       ctx.fillStyle = { note: "#fff6c8", dish: "#f2c14e" }[item.kind] ?? "#e07a5f"; ctx.strokeStyle = "#5a3a1a"; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(x, surface - 10, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
@@ -1300,7 +1340,8 @@ export class RoomView {
       ctx.fillStyle = "#6b5140"; ctx.fill(path);
       ctx.strokeStyle = "#a88a63"; ctx.lineWidth = 4; ctx.stroke(path);
       ctx.fillStyle = "#3b2f2a"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText(this.state.rooms[door.to]?.name ?? "", top[0], top[1] - 8);
+      const beyond = this.state.rooms[door.to];
+      ctx.fillText(beyond ? `${beyond.name}${beyond.locked ? "（休息中）" : ""}` : "", top[0], top[1] - 8);   // 鎖著的房間門上寫休息中
       ctx.restore();
     }
   }
