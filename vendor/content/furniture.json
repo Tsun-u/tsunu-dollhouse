@@ -356,6 +356,20 @@
    "width": 445
   }
  },
+ "folding_screen": {
+  "label": "屏風",
+  "w": 2,
+  "d": 1,
+  "height": 1.8,
+  "color": "#d4a66a",
+  "price": 280,
+  "image": "assets/furniture/folding_screen.png",
+  "anchor": {
+   "x": 651,
+   "y": 720,
+   "width": 412
+  }
+ },
  "tv": {
   "label": "電視櫃",
   "w": 2,
